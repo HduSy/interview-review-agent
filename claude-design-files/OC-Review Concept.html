@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>OC-Review · 产品概念</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #ede7dc; font-family: Inter, sans-serif; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    kbd { font-family: "JetBrains Mono", monospace; }
+    /* Selection color */
+    ::selection { background: rgba(204,120,92,0.25); }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="screens-extra.jsx"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useEffect } = React;
+
+    function App() {
+      return (
+        <DesignCanvas
+          title="OC-Review"
+          subtitle="AI Native 面试助手 · 概念设计 v0.1"
+          background="#ede7dc"
+        >
+          <DCSection id="core" title="Core conversation">
+            <DCArtboard id="welcome" label="01 · 空状态 / 欢迎页" width={1320} height={840}>
+              <ScreenWelcome />
+            </DCArtboard>
+            <DCArtboard id="slash" label="02 · Slash 命令面板" width={1320} height={840}>
+              <ScreenSlash />
+            </DCArtboard>
+            <DCArtboard id="mock" label="03 · /mock 模拟面试进行中" width={1320} height={840}>
+              <ScreenMock />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="feedback" title="Feedback & practice">
+            <DCArtboard id="review" label="04 · /review 复盘结构化反馈" width={1320} height={840}>
+              <ScreenReview />
+            </DCArtboard>
+            <DCArtboard id="practice" label="05 · /practice 随堂练习" width={1320} height={840}>
+              <ScreenPractice />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="navigation" title="Navigation & settings">
+            <DCArtboard id="history" label="06 · 侧栏展开 + /mock 历史" width={1320} height={840}>
+              <ScreenHistory />
+            </DCArtboard>
+            <DCArtboard id="review-history" label="06b · /review 历史" width={1320} height={840}>
+              <ScreenReviewHistory />
+            </DCArtboard>
+            <DCArtboard id="practice-history" label="06c · /practice 历史 + 热力图" width={1320} height={840}>
+              <ScreenPracticeHistory />
+            </DCArtboard>
+            <DCArtboard id="predict-history" label="06d · /predict 历史 + 命中率" width={1320} height={840}>
+              <ScreenPredictHistory />
+            </DCArtboard>
+            <DCArtboard id="optimize-history" label="06e · /optimize 历史 + Before / After" width={1320} height={840}>
+              <ScreenOptimizeHistory />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="settings" title="Settings">
+            <DCArtboard id="settings" label="07a · /settings · 画像" width={1320} height={840}>
+              <ScreenSettings />
+            </DCArtboard>
+            <DCArtboard id="settings-api" label="07b · /settings · 模型 & API" width={1320} height={840}>
+              <ScreenSettingsApi />
+            </DCArtboard>
+            <DCArtboard id="settings-usage" label="07c · /settings · 用量" width={1320} height={840}>
+              <ScreenSettingsUsage />
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
