@@ -139,6 +139,19 @@ export const HISTORY_STUB: HistoryByMode = {
 export type StatBadge = { v: string; label: string; color?: "primary" };
 export type HeadlineSegment = string | { primary: string };
 
+export type RecentRef = {
+  mode: Exclude<ModeId, "chat">;
+  itemId: string;
+  title: string;
+};
+
+export const RECENT_ITEMS: RecentRef[] = [
+  { mode: "mock", itemId: "m1", title: "Google · Frontend SR · 模拟" },
+  { mode: "review", itemId: "r1", title: "字节 抖音 · 二面行为复盘" },
+  { mode: "optimize", itemId: "o2", title: "React useMemo/useCallback · 改写" },
+  { mode: "predict", itemId: "f1", title: "Google · 预测题集 12 道" },
+];
+
 export type HistoryMeta = {
   headline: HeadlineSegment[];
   ctaLabel: string;

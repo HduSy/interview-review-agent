@@ -1,4 +1,8 @@
 import Dexie, { type Table } from "dexie";
+import { PROVIDER_DEFAULT_URL, type Provider } from "./providers";
+
+export type { Provider };
+export { PROVIDER_DEFAULT_URL };
 
 export type Profile = {
   id: "me";
@@ -10,23 +14,6 @@ export type Profile = {
   resumeFileName?: string;
   resumeFileSize?: number;
   updatedAt: number;
-};
-
-export type Provider =
-  | "anthropic"
-  | "openai"
-  | "google"
-  | "zhipu"
-  | "azure-openai"
-  | "custom";
-
-export const PROVIDER_DEFAULT_URL: Record<Provider, string> = {
-  anthropic: "https://api.anthropic.com/v1",
-  openai: "https://api.openai.com/v1",
-  google: "https://generativelanguage.googleapis.com/v1beta",
-  zhipu: "https://open.bigmodel.cn/api/paas/v4",
-  "azure-openai": "",
-  custom: "",
 };
 
 export type ApiConfig = {

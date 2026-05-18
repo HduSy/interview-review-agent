@@ -4,15 +4,8 @@ import clsx from "clsx";
 import { PanelLeft, Plus, Settings as SettingsIcon } from "lucide-react";
 import { Wordmark } from "./spike-mark";
 import { RAIL_MODES, type ModeId } from "@/lib/commands";
-import { HISTORY_STUB } from "@/lib/history-stub";
+import { HISTORY_STUB, RECENT_ITEMS } from "@/lib/history-stub";
 import { useAppStore } from "@/lib/store";
-
-const RECENT = [
-  "Google · Frontend SR · 模拟",
-  "字节 抖音 · 系统设计复盘",
-  "React 状态管理 · 答案优化",
-  "今日预测题 · 5 道",
-];
 
 export function ExpandedSidebar() {
   const view = useAppStore((s) => s.view);
@@ -20,6 +13,8 @@ export function ExpandedSidebar() {
   const collapseSidebar = useAppStore((s) => s.collapseSidebar);
   const newChat = useAppStore((s) => s.newChat);
   const openSettings = useAppStore((s) => s.openSettings);
+  const loadHistoryItem = useAppStore((s) => s.loadHistoryItem);
+  const chatMode = useAppStore((s) => s.chatMode);
 
   return (
     <aside className="w-[248px] bg-surface-soft border-r border-hairline px-4 py-5 flex flex-col gap-1 shrink-0">
@@ -76,16 +71,27 @@ export function ExpandedSidebar() {
       <div className="text-[11px] font-medium tracking-[0.12em] uppercase text-muted-soft px-3 pb-1.5">
         Recent
       </div>
-      {RECENT.map((t) => (
-        <button
-          key={t}
-          className="px-3 py-1.5 rounded-md text-[13px] text-body text-left whitespace-nowrap overflow-hidden text-ellipsis hover:bg-surface-card"
-        >
-          {t}
-        </button>
-      ))}
+      {RECENT_ITEMS.map((r) => {
+        const active = view.kind === "chat" && chatMode === r.mode;
+        return (
+          <button
+            key={`${r.mode}:${r.itemId}`}
+            onClick={() => loadHistoryItem(r.mode, r.itemId)}
+            title={`/${r.mode} · ${r.title}`}
+            className={clsx(
+              "px-3 py-1.5 rounded-md text-[13px] text-left whitespace-nowrap overflow-hidden text-ellipsis",
+              active ? "bg-surface-card text-ink" : "text-body hover:bg-surface-card",
+            )}
+          >
+            {r.title}
+          </button>
+        );
+      })}
       <div className="flex-1" />
-      <div className="flex items-center gap-2.5 p-2.5 rounded-md bg-canvas border border-hairline">
+      <button
+        onClick={() => openSettings()}
+        className="flex items-center gap-2.5 p-2.5 rounded-md bg-canvas border border-hairline hover:bg-surface-card transition-colors text-left"
+      >
         <div className="w-7 h-7 rounded-full bg-surface-dark text-on-dark flex items-center justify-center text-[11px] font-medium shrink-0">
           YT
         </div>
@@ -93,14 +99,8 @@ export function ExpandedSidebar() {
           <span className="text-[13px] text-ink font-medium">Yuxin Tao</span>
           <span className="font-mono text-[11px] text-muted truncate">claude-sonnet-4.5</span>
         </div>
-        <button
-          onClick={() => openSettings()}
-          aria-label="settings"
-          className="text-muted hover:text-ink"
-        >
-          <SettingsIcon size={15} strokeWidth={1.6} />
-        </button>
-      </div>
+        <SettingsIcon size={15} strokeWidth={1.6} className="text-muted" />
+      </button>
     </aside>
   );
 }

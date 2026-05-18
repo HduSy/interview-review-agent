@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ArrowRight, Wand2 } from "lucide-react";
 import clsx from "clsx";
 import type { ModeId } from "@/lib/commands";
@@ -12,30 +13,137 @@ import {
   type PredictHistoryItem,
   type ReviewHistoryItem,
 } from "@/lib/history-stub";
+import { useAppStore } from "@/lib/store";
 import { HistoryShell } from "./history-shell";
 
 export function HistoryView({ mode }: { mode: Exclude<ModeId, "chat"> }) {
   const meta = HISTORY_META[mode];
+  const [filter, setFilter] = useState<string>("全部");
+  const [search, setSearch] = useState("");
+
+  // Reset filter / search when switching mode (chips differ per mode).
+  useEffect(() => {
+    setFilter("全部");
+    setSearch("");
+  }, [mode]);
+
+  const q = search.trim().toLowerCase();
+  const mock = HISTORY_STUB.mock.filter((it) => mockMatches(it, filter, q));
+  const review = HISTORY_STUB.review.filter((it) => reviewMatches(it, filter, q));
+  const practice = HISTORY_STUB.practice.filter((it) => practiceMatches(it, filter, q));
+  const predict = HISTORY_STUB.predict.filter((it) => predictMatches(it, filter, q));
+  const optimize = HISTORY_STUB.optimize.filter((it) => optimizeMatches(it, filter, q));
 
   return (
-    <HistoryShell mode={mode} meta={meta}>
-      {mode === "mock" && <MockList items={HISTORY_STUB.mock} />}
-      {mode === "review" && <ReviewList items={HISTORY_STUB.review} />}
-      {mode === "practice" && <PracticeList items={HISTORY_STUB.practice} />}
-      {mode === "predict" && <PredictList items={HISTORY_STUB.predict} />}
-      {mode === "optimize" && <OptimizeList items={HISTORY_STUB.optimize} />}
+    <HistoryShell
+      mode={mode}
+      meta={meta}
+      activeFilter={filter}
+      onSelectFilter={setFilter}
+      search={search}
+      onSearchChange={setSearch}
+    >
+      {mode === "mock" && <MockList items={mock} empty={emptyMsg(mock.length, q)} />}
+      {mode === "review" && <ReviewList items={review} empty={emptyMsg(review.length, q)} />}
+      {mode === "practice" && (
+        <PracticeList items={practice} empty={emptyMsg(practice.length, q)} />
+      )}
+      {mode === "predict" && (
+        <PredictList items={predict} empty={emptyMsg(predict.length, q)} />
+      )}
+      {mode === "optimize" && (
+        <OptimizeList items={optimize} empty={emptyMsg(optimize.length, q)} />
+      )}
     </HistoryShell>
   );
 }
 
+function emptyMsg(count: number, q: string): string | null {
+  if (count > 0) return null;
+  return q ? `没有匹配「${q}」的记录` : "当前筛选下还没有记录";
+}
+
+function EmptyState({ msg }: { msg: string }) {
+  return (
+    <div className="text-center text-[13px] text-muted-soft py-16">{msg}</div>
+  );
+}
+
+// ─── Match helpers ───────────────────────────────────────────────────
+
+function searchMatch(text: string, q: string): boolean {
+  if (!q) return true;
+  return text.toLowerCase().includes(q);
+}
+
+function mockMatches(it: MockHistoryItem, filter: string, q: string): boolean {
+  if (!searchMatch(`${it.co} ${it.role} ${it.round}`, q)) return false;
+  if (filter === "全部") return true;
+  if (filter === "其它") return !["Google", "字节", "Stripe"].includes(it.co);
+  return it.co === filter;
+}
+
+function reviewMatches(it: ReviewHistoryItem, filter: string, q: string): boolean {
+  if (!searchMatch(`${it.co} ${it.round} ${it.source} ${it.top}`, q)) return false;
+  if (filter === "全部") return true;
+  if (filter === "其它") {
+    return !["行为", "系统设计", "项目深挖"].some((k) => it.round.includes(k));
+  }
+  const map: Record<string, string> = {
+    行为面: "行为",
+    系统设计: "系统设计",
+    项目深挖: "项目深挖",
+  };
+  const needle = map[filter] ?? filter;
+  return it.round.includes(needle);
+}
+
+function practiceMatches(
+  it: PracticeHistoryItem,
+  filter: string,
+  q: string,
+): boolean {
+  if (!searchMatch(`${it.q} ${it.type}`, q)) return false;
+  if (filter === "全部") return true;
+  if (filter === "需重做") return !it.rating.startsWith("A");
+  return it.type.includes(filter);
+}
+
+function predictMatches(
+  it: PredictHistoryItem,
+  filter: string,
+  q: string,
+): boolean {
+  const text = `${it.title} ${it.basis} ${it.hottest.join(" ")}`;
+  if (!searchMatch(text, q)) return false;
+  if (filter === "全部") return true;
+  if (filter === "已用") return it.hit > 0;
+  if (filter === "未验证") return it.pending > 0;
+  if (filter === "失效") return it.hit === 0 && it.pending === 0;
+  return true;
+}
+
+function optimizeMatches(
+  it: OptimizeHistoryItem,
+  filter: string,
+  q: string,
+): boolean {
+  if (!searchMatch(`${it.q} ${it.before} ${it.after} ${it.tag}`, q)) return false;
+  if (filter === "全部") return true;
+  return it.tag.includes(filter);
+}
+
 // ─── Mock ────────────────────────────────────────────────────────────
 
-function MockList({ items }: { items: MockHistoryItem[] }) {
+function MockList({ items, empty }: { items: MockHistoryItem[]; empty: string | null }) {
+  const load = useAppStore((s) => s.loadHistoryItem);
+  if (empty) return <EmptyState msg={empty} />;
   return (
     <div>
       {items.map((m) => (
         <button
           key={m.id}
+          onClick={() => load("mock", m.id)}
           className="w-full flex items-center gap-5 px-6 py-4 border-b border-hairline-soft text-left hover:bg-surface-soft transition-colors"
         >
           <div
@@ -78,12 +186,21 @@ function MockList({ items }: { items: MockHistoryItem[] }) {
 
 // ─── Review ──────────────────────────────────────────────────────────
 
-function ReviewList({ items }: { items: ReviewHistoryItem[] }) {
+function ReviewList({
+  items,
+  empty,
+}: {
+  items: ReviewHistoryItem[];
+  empty: string | null;
+}) {
+  const load = useAppStore((s) => s.loadHistoryItem);
+  if (empty) return <EmptyState msg={empty} />;
   return (
     <div>
       {items.map((it) => (
         <button
           key={it.id}
+          onClick={() => load("review", it.id)}
           className="w-full flex items-center gap-[22px] px-6 py-4 border-b border-hairline-soft text-left hover:bg-surface-soft transition-colors"
         >
           <div className="flex-1 min-w-0">
@@ -140,40 +257,52 @@ function StarBars({ values }: { values: [number, number, number, number] }) {
 
 // ─── Practice ────────────────────────────────────────────────────────
 
-function PracticeList({ items }: { items: PracticeHistoryItem[] }) {
+function PracticeList({
+  items,
+  empty,
+}: {
+  items: PracticeHistoryItem[];
+  empty: string | null;
+}) {
+  const load = useAppStore((s) => s.loadHistoryItem);
   return (
     <div>
       <div className="px-6 pb-2 pt-4">
         <Heatmap />
       </div>
-      {items.map((it) => (
-        <button
-          key={it.id}
-          className="w-full flex items-center gap-4 px-6 py-3.5 border-b border-hairline-soft text-left hover:bg-surface-soft transition-colors"
-        >
-          <span className="font-mono text-[12px] text-muted-soft min-w-[28px]">
-            #{it.n}
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className="text-[14px] text-ink mb-1 font-medium truncate">{it.q}</div>
-            <div className="flex gap-2 items-center">
-              <TypePill type={it.type} />
-              <span className="font-mono text-[11px] text-muted">{it.duration}</span>
-            </div>
-          </div>
-          <span
-            className={clsx(
-              "font-medium text-[22px] tracking-[-0.02em] min-w-8 text-center",
-              ratingClass(it.rating),
-            )}
-            style={{ fontFamily: "var(--font-serif)" }}
+      {empty ? (
+        <EmptyState msg={empty} />
+      ) : (
+        items.map((it) => (
+          <button
+            key={it.id}
+            onClick={() => load("practice", it.id)}
+            className="w-full flex items-center gap-4 px-6 py-3.5 border-b border-hairline-soft text-left hover:bg-surface-soft transition-colors"
           >
-            {it.rating}
-          </span>
-          <span className="text-[13px] text-muted min-w-[70px] text-right">{it.date}</span>
-          <ArrowRight size={16} strokeWidth={1.8} className="text-muted shrink-0" />
-        </button>
-      ))}
+            <span className="font-mono text-[12px] text-muted-soft min-w-[28px]">
+              #{it.n}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] text-ink mb-1 font-medium truncate">{it.q}</div>
+              <div className="flex gap-2 items-center">
+                <TypePill type={it.type} />
+                <span className="font-mono text-[11px] text-muted">{it.duration}</span>
+              </div>
+            </div>
+            <span
+              className={clsx(
+                "font-medium text-[22px] tracking-[-0.02em] min-w-8 text-center",
+                ratingClass(it.rating),
+              )}
+              style={{ fontFamily: "var(--font-serif)" }}
+            >
+              {it.rating}
+            </span>
+            <span className="text-[13px] text-muted min-w-[70px] text-right">{it.date}</span>
+            <ArrowRight size={16} strokeWidth={1.8} className="text-muted shrink-0" />
+          </button>
+        ))
+      )}
     </div>
   );
 }
@@ -265,7 +394,15 @@ function Heatmap() {
 
 // ─── Predict ─────────────────────────────────────────────────────────
 
-function PredictList({ items }: { items: PredictHistoryItem[] }) {
+function PredictList({
+  items,
+  empty,
+}: {
+  items: PredictHistoryItem[];
+  empty: string | null;
+}) {
+  const load = useAppStore((s) => s.loadHistoryItem);
+  if (empty) return <EmptyState msg={empty} />;
   return (
     <div className="grid gap-3.5 px-6 py-3">
       {items.map((s) => {
@@ -274,7 +411,16 @@ function PredictList({ items }: { items: PredictHistoryItem[] }) {
         return (
           <div
             key={s.id}
-            className="bg-canvas border border-hairline rounded-xl p-5 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6"
+            role="button"
+            tabIndex={0}
+            onClick={() => load("predict", s.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                load("predict", s.id);
+              }
+            }}
+            className="bg-canvas border border-hairline rounded-xl p-5 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 cursor-pointer hover:bg-surface-soft transition-colors"
           >
             <div>
               <div className="flex items-baseline gap-3 mb-1.5 flex-wrap">
@@ -336,14 +482,6 @@ function PredictList({ items }: { items: PredictHistoryItem[] }) {
                   待验证 {s.pending}
                 </span>
               </div>
-              <div className="mt-1.5 flex gap-2 flex-wrap">
-                <button className="bg-primary hover:bg-primary-active text-white text-[13px] font-medium px-4 py-2 rounded-md">
-                  用作 /mock 题库
-                </button>
-                <button className="bg-canvas text-ink border border-hairline text-[13px] font-medium px-4 py-2 rounded-md hover:bg-surface-card">
-                  查看全部
-                </button>
-              </div>
             </div>
           </div>
         );
@@ -354,13 +492,30 @@ function PredictList({ items }: { items: PredictHistoryItem[] }) {
 
 // ─── Optimize ────────────────────────────────────────────────────────
 
-function OptimizeList({ items }: { items: OptimizeHistoryItem[] }) {
+function OptimizeList({
+  items,
+  empty,
+}: {
+  items: OptimizeHistoryItem[];
+  empty: string | null;
+}) {
+  const load = useAppStore((s) => s.loadHistoryItem);
+  if (empty) return <EmptyState msg={empty} />;
   return (
     <div className="grid gap-3.5 px-6 py-3">
       {items.map((it) => (
         <div
           key={it.id}
-          className="bg-canvas border border-hairline rounded-xl p-5"
+          role="button"
+          tabIndex={0}
+          onClick={() => load("optimize", it.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              load("optimize", it.id);
+            }
+          }}
+          className="bg-canvas border border-hairline rounded-xl p-5 cursor-pointer hover:bg-surface-soft transition-colors"
         >
           <div className="flex items-center gap-2.5 mb-3.5 flex-wrap">
             <Wand2 size={14} strokeWidth={1.8} className="text-primary" />

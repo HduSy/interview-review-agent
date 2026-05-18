@@ -56,9 +56,13 @@ export function Rail() {
       >
         <SettingsIcon size={18} strokeWidth={1.6} />
       </button>
-      <div className="w-8 h-8 rounded-full bg-surface-dark text-on-dark flex items-center justify-center text-xs font-medium mt-1.5">
+      <button
+        onClick={() => openSettings()}
+        title="打开画像设置"
+        className="w-8 h-8 rounded-full bg-surface-dark text-on-dark flex items-center justify-center text-xs font-medium mt-1.5 hover:opacity-90"
+      >
         YT
-      </div>
+      </button>
     </aside>
   );
 }

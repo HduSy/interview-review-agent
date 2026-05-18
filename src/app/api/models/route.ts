@@ -1,4 +1,4 @@
-import { PROVIDER_DEFAULT_URL, type Provider } from "@/lib/db";
+import { PROVIDER_DEFAULT_URL, type Provider } from "@/lib/providers";
 
 export const runtime = "edge";
 

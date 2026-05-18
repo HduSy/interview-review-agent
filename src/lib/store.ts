@@ -11,6 +11,7 @@ import {
 } from "./demo-payloads";
 import { buildSystemPrompt } from "./prompts";
 import { resolveModel } from "./model-mapping";
+import { OUTPUT_SPECS } from "./output-specs";
 import {
   DEFAULT_API_CONFIG,
   DEFAULT_PROFILE,
@@ -25,6 +26,15 @@ import {
   type Profile,
   type Provider,
 } from "./db";
+import {
+  HISTORY_STUB,
+  type HistoryItem,
+  type MockHistoryItem,
+  type OptimizeHistoryItem,
+  type PracticeHistoryItem,
+  type PredictHistoryItem,
+  type ReviewHistoryItem,
+} from "./history-stub";
 
 export type SettingsTab = "profile" | "api" | "usage";
 
@@ -83,6 +93,7 @@ type Actions = {
 
   sendUserMessage: (content: string) => void;
   appendIntroIfEmpty: (mode: ModeId) => void;
+  loadHistoryItem: (mode: Exclude<ModeId, "chat">, itemId: string) => void;
 };
 
 const PLACEHOLDER_AI_DELAY_MS = 600;
@@ -278,6 +289,17 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   setModelPickerSubOpen: (open) => set({ modelPickerSubOpen: open }),
   closeModelPicker: () => set({ modelPickerOpen: false, modelPickerSubOpen: false }),
 
+  loadHistoryItem: (mode, itemId) => {
+    const items = HISTORY_STUB[mode] as HistoryItem[];
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    set({
+      view: { kind: "chat" },
+      chatMode: mode,
+      messages: messagesFromHistoryItem(item),
+    });
+  },
+
   appendIntroIfEmpty: (mode) => {
     if (mode === "chat") return;
     const { messages } = get();
@@ -420,24 +442,58 @@ async function streamReply({
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
+    const spec = OUTPUT_SPECS[mode];
     let acc = "";
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
       acc += decoder.decode(value, { stream: true });
+      // While streaming: if schema markers have appeared, render as a
+      // partial card; otherwise show raw text accumulating.
+      const partial = spec?.parsePartial(acc) ?? null;
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === pendingId
-            ? { ...m, content: acc, pending: false }
+            ? partial
+              ? {
+                  ...m,
+                  content: partial.summary,
+                  payload: partial.payload,
+                  pending: false,
+                }
+              : { ...m, content: acc, payload: undefined, pending: false }
             : m,
         ),
       }));
     }
     acc += decoder.decode();
+
+    // Final pass: strict parse confirms all required fields landed.
+    const finalParsed = spec?.parse(acc) ?? null;
+    if (finalParsed) {
+      set((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === pendingId
+            ? {
+                ...m,
+                content: finalParsed.summary,
+                payload: finalParsed.payload,
+                pending: false,
+              }
+            : m,
+        ),
+      }));
+      return;
+    }
+
+    // Strict parse failed — keep whatever partial state we ended on, or
+    // fall through to plain text if no schema ever appeared.
     set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === pendingId ? { ...m, content: acc, pending: false } : m,
-      ),
+      messages: s.messages.map((m) => {
+        if (m.id !== pendingId) return m;
+        if (m.payload) return { ...m, pending: false };
+        return { ...m, content: acc, pending: false };
+      }),
     }));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -451,20 +507,146 @@ async function streamReply({
   }
 }
 
+function messagesFromHistoryItem(item: HistoryItem): Message[] {
+  const baseTs = Date.now();
+  switch (item.kind) {
+    case "mock": {
+      const m = item as MockHistoryItem;
+      return [
+        {
+          id: makeId(),
+          role: "user",
+          content: `开始 ${m.co} 的模拟面试 — ${m.role}，重点放在 ${m.round}。`,
+          mode: "mock",
+          createdAt: baseTs,
+        },
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `好。我们这一轮按 ${m.round} 走，时间预算约 ${m.duration}。先用一个 system design 的题切入：在 ${m.co} 内部产品里，你会怎么设计一个支持多团队协作的实时编辑系统？\n\n（这是历史会话快照 · 评级 ${m.grade}）`,
+          mode: "mock",
+          createdAt: baseTs + 1,
+        },
+      ];
+    }
+    case "review": {
+      const r = item as ReviewHistoryItem;
+      return [
+        {
+          id: makeId(),
+          role: "user",
+          content: `${r.source}\n\n"面试官：聊一下你最难的一次跨团队协作…\n我：当时我们要推一个埋点规范，涉及 5 个业务线。我先去找了各业务的负责人聊…"`,
+          mode: "review",
+          createdAt: baseTs,
+        },
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `${r.co} · ${r.round} 复盘已完成。整体评级取决于 ${r.top}，详见下方维度卡。`,
+          mode: "review",
+          createdAt: baseTs + 1,
+          payload: DEMO_REVIEW,
+        },
+      ];
+    }
+    case "practice": {
+      const p = item as PracticeHistoryItem;
+      return [
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `（第 ${p.n} 题 · ${p.type} · 用时 ${p.duration} · 评级 ${p.rating}）`,
+          mode: "practice",
+          createdAt: baseTs,
+          payload: {
+            ...DEMO_PRACTICE,
+            title: p.q,
+            category: p.type,
+            difficulty: DEMO_PRACTICE.difficulty,
+            estimated: `预计 ${p.duration}`,
+            track: DEMO_PRACTICE.track,
+          },
+        },
+      ];
+    }
+    case "predict": {
+      const f = item as PredictHistoryItem;
+      return [
+        {
+          id: makeId(),
+          role: "user",
+          content: `基于 ${f.title} 的 JD + 我的简历，预测可能的面试题。`,
+          mode: "predict",
+          createdAt: baseTs,
+        },
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `已生成 ${f.total} 道预测题，目前命中 ${f.hit} 题、${f.pending} 待验证。`,
+          mode: "predict",
+          createdAt: baseTs + 1,
+          payload: { ...DEMO_PREDICT, context: f.basis, hottest: f.hottest, total: f.total },
+        },
+      ];
+    }
+    case "optimize": {
+      const o = item as OptimizeHistoryItem;
+      return [
+        {
+          id: makeId(),
+          role: "user",
+          content: o.before,
+          mode: "optimize",
+          createdAt: baseTs,
+        },
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `改写完了 — 主轴 ${o.tag}，下面是 Before / After 对照。`,
+          mode: "optimize",
+          createdAt: baseTs + 1,
+          payload: {
+            ...DEMO_OPTIMIZE,
+            question: o.q,
+            tag: o.tag,
+            before: o.before,
+            after: o.after,
+          },
+        },
+      ];
+    }
+  }
+}
+
+/**
+ * Materialize a message's text for API replay. If the message carries
+ * a rich payload (parsed structured response or demo / loaded history),
+ * we re-serialize the payload so the next AI turn sees the original
+ * schema context — not just the human-friendly summary blurb.
+ */
+function fullText(m: Message): string {
+  if (m.payload) {
+    const spec = OUTPUT_SPECS[m.mode];
+    if (spec) return spec.serialize(m.payload, m.content);
+  }
+  return m.content;
+}
+
 function normalizeForApi(
   msgs: Message[],
 ): Array<{ role: "user" | "assistant"; content: string }> {
-  const live = msgs.filter((m) => !m.pending && m.content.trim());
+  const live = msgs.filter((m) => !m.pending && fullText(m).trim());
   let i = 0;
   while (i < live.length && live[i].role !== "user") i++;
   const trimmed = live.slice(i);
   const merged: Array<{ role: "user" | "assistant"; content: string }> = [];
   for (const m of trimmed) {
+    const text = fullText(m);
     const last = merged[merged.length - 1];
     if (last && last.role === m.role) {
-      last.content = `${last.content}\n\n${m.content}`;
+      last.content = `${last.content}\n\n${text}`;
     } else {
-      merged.push({ role: m.role, content: m.content });
+      merged.push({ role: m.role, content: text });
     }
   }
   return merged;

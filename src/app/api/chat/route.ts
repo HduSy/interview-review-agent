@@ -2,7 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, type ModelMessage } from "ai";
-import type { Provider } from "@/lib/db";
+import type { Provider } from "@/lib/providers";
 
 export const runtime = "edge";
 
