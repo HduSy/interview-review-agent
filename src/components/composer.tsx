@@ -118,6 +118,11 @@ export function Composer({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // While an IME composition is active (Chinese / Japanese / Korean
+    // candidate window open), Enter belongs to the IME for confirming
+    // the selected word — don't intercept it as submit.
+    const composing = e.nativeEvent.isComposing || e.keyCode === 229;
+
     if (paletteOpen && filteredCommands.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -131,7 +136,7 @@ export function Composer({
         );
         return;
       }
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey && !composing) {
         e.preventDefault();
         pickCommand(filteredCommands[selectedIndex]);
         return;
@@ -142,7 +147,7 @@ export function Composer({
         return;
       }
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !composing) {
       e.preventDefault();
       handleSubmit();
     }

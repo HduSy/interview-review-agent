@@ -409,15 +409,31 @@ function ApiTab() {
 }
 
 function UsageTab() {
+  const stats = useAppStore((s) => s.usageStats);
+  const refresh = useAppStore((s) => s.refreshUsage);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const fmt = (n: number | undefined) =>
+    typeof n === "number" ? n.toLocaleString() : "—";
+  const avg =
+    stats && stats.totalCalls > 0
+      ? Math.round((stats.monthTokens || 0) / stats.totalCalls)
+      : null;
+
+  const cards: { label: string; value: string }[] = [
+    { label: "今日 Tokens", value: fmt(stats?.todayTokens) },
+    { label: "本月 Tokens", value: fmt(stats?.monthTokens) },
+    { label: "累计调用", value: fmt(stats?.totalCalls) },
+    { label: "平均每次", value: avg !== null ? avg.toLocaleString() : "—" },
+  ];
+
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        {[
-          { label: "今日 Tokens", value: "—" },
-          { label: "本月 Tokens", value: "—" },
-          { label: "本月费用", value: "—" },
-          { label: "调用次数", value: "—" },
-        ].map((s) => (
+        {cards.map((s) => (
           <div
             key={s.label}
             className="bg-canvas border border-hairline rounded-xl px-4 py-3.5"
@@ -432,9 +448,42 @@ function UsageTab() {
           </div>
         ))}
       </div>
-      <div className="px-4 py-3 bg-surface-soft border border-hairline-soft rounded-md text-[12px] text-muted leading-[1.55]">
-        用量数据接入 Phase 6 后会实时累计 prompt / completion token 与估算费用。所有数据仅保存在本地。
-      </div>
+
+      {stats && stats.recentRows.length > 0 ? (
+        <div>
+          <div className="text-[11px] font-medium tracking-[0.12em] uppercase text-muted-soft px-1 pb-2">
+            最近调用
+          </div>
+          <div className="bg-canvas border border-hairline rounded-md overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-3 py-2 text-[11px] font-medium tracking-[0.06em] uppercase text-muted-soft border-b border-hairline-soft">
+              <span>Model</span>
+              <span className="text-right">In</span>
+              <span className="text-right">Out</span>
+              <span className="text-right">When</span>
+            </div>
+            {stats.recentRows.map((r) => (
+              <div
+                key={r.id}
+                className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-3 py-2 text-[12px] text-body border-b border-hairline-soft last:border-b-0 font-mono"
+              >
+                <span className="truncate text-ink">{r.model}</span>
+                <span className="text-right">{r.promptTokens}</span>
+                <span className="text-right">{r.completionTokens}</span>
+                <span className="text-right text-muted">
+                  {new Date(r.ts).toLocaleTimeString("zh-CN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 py-3 bg-surface-soft border border-hairline-soft rounded-md text-[12px] text-muted leading-[1.55]">
+          还没有调用记录。每次成功流式回复后会在这里累加 input / output token。所有数据仅保存在本地 IndexedDB。
+        </div>
+      )}
     </div>
   );
 }

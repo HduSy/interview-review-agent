@@ -68,7 +68,7 @@ export function ModelPicker() {
           toggleOpen();
         }}
         className={clsx(
-          "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[13px] text-body hover:bg-surface-card transition-colors",
+          "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[13px] text-body hover:bg-surface-card transition-colors uppercase tracking-[0.03em]",
           open && "bg-surface-card",
         )}
       >
@@ -92,7 +92,7 @@ export function ModelPicker() {
             className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-surface-soft"
           >
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-medium text-ink leading-tight truncate">
+              <div className="text-[14px] font-medium text-ink leading-tight truncate uppercase tracking-[0.03em]">
                 {selected.name}
               </div>
               {selected.desc && (
@@ -215,7 +215,7 @@ function ModelRow({
       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-surface-soft"
     >
       <div className="flex-1 min-w-0">
-        <div className="text-[14px] font-medium text-ink truncate">
+        <div className="text-[14px] font-medium text-ink truncate uppercase tracking-[0.03em]">
           {model.name}
         </div>
         {model.desc && (

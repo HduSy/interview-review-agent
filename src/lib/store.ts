@@ -22,9 +22,12 @@ import {
   saveProfile,
   saveResume,
   deleteResume,
+  recordUsage,
+  loadUsageStats,
   type ApiConfig,
   type Profile,
   type Provider,
+  type UsageStats,
 } from "./db";
 import {
   HISTORY_STUB,
@@ -37,6 +40,14 @@ import {
 } from "./history-stub";
 
 export type SettingsTab = "profile" | "api" | "usage";
+
+export type ToastKind = "success" | "info" | "error";
+export type Toast = {
+  id: string;
+  text: string;
+  kind: ToastKind;
+  durationMs: number;
+};
 
 export type View =
   | { kind: "chat" }
@@ -59,6 +70,8 @@ type State = {
   availableModels: RemoteModel[];
   modelsLoading: boolean;
   modelsError: string | null;
+  usageStats: UsageStats | null;
+  toasts: Toast[];
 };
 
 type Actions = {
@@ -94,6 +107,11 @@ type Actions = {
   sendUserMessage: (content: string) => void;
   appendIntroIfEmpty: (mode: ModeId) => void;
   loadHistoryItem: (mode: Exclude<ModeId, "chat">, itemId: string) => void;
+
+  refreshUsage: () => Promise<void>;
+
+  pushToast: (text: string, kind?: ToastKind, durationMs?: number) => string;
+  dismissToast: (id: string) => void;
 };
 
 const PLACEHOLDER_AI_DELAY_MS = 600;
@@ -156,6 +174,8 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   availableModels: [],
   modelsLoading: false,
   modelsError: null,
+  usageStats: null,
+  toasts: [],
 
   activateChatMode: (id) => {
     if (id === "settings") {
@@ -247,6 +267,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       set({ modelsLoading: false, modelsError: msg, availableModels: [] });
+      get().pushToast(`拉取模型失败：${msg}`, "error");
     }
   },
 
@@ -288,6 +309,25 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     })),
   setModelPickerSubOpen: (open) => set({ modelPickerSubOpen: open }),
   closeModelPicker: () => set({ modelPickerOpen: false, modelPickerSubOpen: false }),
+
+  refreshUsage: async () => {
+    const stats = await loadUsageStats();
+    set({ usageStats: stats });
+  },
+
+  pushToast: (text, kind = "info", durationMs = 3200) => {
+    const id = makeId();
+    set((s) => ({ toasts: [...s.toasts, { id, text, kind, durationMs }] }));
+    if (durationMs > 0) {
+      setTimeout(() => {
+        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+      }, durationMs);
+    }
+    return id;
+  },
+
+  dismissToast: (id) =>
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   loadHistoryItem: (mode, itemId) => {
     const items = HISTORY_STUB[mode] as HistoryItem[];
@@ -448,9 +488,8 @@ async function streamReply({
       const { value, done } = await reader.read();
       if (done) break;
       acc += decoder.decode(value, { stream: true });
-      // While streaming: if schema markers have appeared, render as a
-      // partial card; otherwise show raw text accumulating.
-      const partial = spec?.parsePartial(acc) ?? null;
+      const { displayText } = stripUsageTrailer(acc);
+      const partial = spec?.parsePartial(displayText) ?? null;
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === pendingId
@@ -461,15 +500,16 @@ async function streamReply({
                   payload: partial.payload,
                   pending: false,
                 }
-              : { ...m, content: acc, payload: undefined, pending: false }
+              : { ...m, content: displayText, payload: undefined, pending: false }
             : m,
         ),
       }));
     }
     acc += decoder.decode();
+    const { displayText: finalText, trailer } = stripUsageTrailer(acc);
 
     // Final pass: strict parse confirms all required fields landed.
-    const finalParsed = spec?.parse(acc) ?? null;
+    const finalParsed = spec?.parse(finalText) ?? null;
     if (finalParsed) {
       set((s) => ({
         messages: s.messages.map((m) =>
@@ -483,18 +523,36 @@ async function streamReply({
             : m,
         ),
       }));
-      return;
+    } else {
+      // Strict parse failed — keep whatever partial state we ended on, or
+      // fall through to plain text if no schema ever appeared.
+      set((s) => ({
+        messages: s.messages.map((m) => {
+          if (m.id !== pendingId) return m;
+          if (m.payload) return { ...m, pending: false };
+          return { ...m, content: finalText, pending: false };
+        }),
+      }));
     }
 
-    // Strict parse failed — keep whatever partial state we ended on, or
-    // fall through to plain text if no schema ever appeared.
-    set((s) => ({
-      messages: s.messages.map((m) => {
-        if (m.id !== pendingId) return m;
-        if (m.payload) return { ...m, pending: false };
-        return { ...m, content: acc, pending: false };
-      }),
-    }));
+    // Record token usage emitted by the server's `finish` event.
+    if (trailer) {
+      try {
+        const data = JSON.parse(trailer);
+        if (data && data.type === "usage") {
+          await recordUsage({
+            ts: Date.now(),
+            model: String(data.model ?? modelId),
+            promptTokens: Number(data.inputTokens) || 0,
+            completionTokens: Number(data.outputTokens) || 0,
+            costUsd: 0,
+          });
+          void useAppStore.getState().refreshUsage();
+        }
+      } catch {
+        // Malformed trailer — ignore.
+      }
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     set((s) => ({
@@ -616,6 +674,29 @@ function messagesFromHistoryItem(item: HistoryItem): Message[] {
       ];
     }
   }
+}
+
+/**
+ * Pull the `{json}` usage trailer the server appends after
+ * the `finish` event. Returns the cleaned display text and the raw JSON
+ * blob (if any). Handles partial trailers (only opening marker received
+ * so far) by hiding the orphan tail until the closer arrives.
+ */
+function stripUsageTrailer(text: string): {
+  displayText: string;
+  trailer: string | null;
+} {
+  const start = text.indexOf("");
+  if (start === -1) return { displayText: text, trailer: null };
+  const end = text.indexOf("", start + 1);
+  if (end === -1) {
+    // Opening seen, closer pending — hide the partial chunk.
+    return { displayText: text.substring(0, start), trailer: null };
+  }
+  return {
+    displayText: text.substring(0, start) + text.substring(end + 1),
+    trailer: text.substring(start + 1, end),
+  };
 }
 
 /**

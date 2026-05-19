@@ -73,6 +73,7 @@ const SCORE_STYLES: Record<
 
 function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
   const sendUserMessage = useAppStore((s) => s.sendUserMessage);
+  const pushToast = useAppStore((s) => s.pushToast);
   const hasSummary = data.summary.trim().length > 0;
   const hasScores = data.scores.length > 0;
   const hasStrengths = data.strengths.length > 0;
@@ -178,10 +179,9 @@ function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
           />
           <ActionButton
             label="把要点存入画像"
-            doneLabel="✓ 已记录"
-            onAct={() => {
-              /* MVP: 仅视觉反馈，后续接 profile.notes */
-            }}
+            onAct={() =>
+              pushToast(`已记录到画像 · ${data.rewrite.tag}`, "success")
+            }
           />
         </div>
       )}

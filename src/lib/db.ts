@@ -115,5 +115,36 @@ export async function loadResume(id: string): Promise<Blob | undefined> {
 }
 
 export async function loadUsage(): Promise<UsageRecord[]> {
-  return db.usage.orderBy("ts").reverse().limit(200).toArray();
+  return db.usage.orderBy("ts").reverse().limit(500).toArray();
+}
+
+export async function recordUsage(r: Omit<UsageRecord, "id">): Promise<void> {
+  await db.usage.add(r);
+}
+
+export type UsageStats = {
+  todayTokens: number;
+  monthTokens: number;
+  totalCalls: number;
+  recentRows: UsageRecord[];
+};
+
+export async function loadUsageStats(): Promise<UsageStats> {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const rows = await loadUsage();
+  let todayTokens = 0;
+  let monthTokens = 0;
+  for (const r of rows) {
+    const total = r.promptTokens + r.completionTokens;
+    if (r.ts >= startOfDay) todayTokens += total;
+    if (r.ts >= startOfMonth) monthTokens += total;
+  }
+  return {
+    todayTokens,
+    monthTokens,
+    totalCalls: rows.length,
+    recentRows: rows.slice(0, 10),
+  };
 }

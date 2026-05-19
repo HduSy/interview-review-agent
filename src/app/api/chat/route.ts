@@ -37,13 +37,14 @@ export async function POST(req: Request) {
 
     // Use fullStream (not textStream) so upstream errors arrive as
     // { type: 'error', error } events instead of being silently swallowed.
+    // Usage info from the `finish` event is encoded as a trailing sentinel
+    // block: {json} — the client strips this before display.
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
           for await (const part of result.fullStream) {
             if (part.type === "text-delta") {
-              // SDK 6 runtime emits `text`, .d.ts declares `delta`. Try both.
               const p = part as unknown as { delta?: string; text?: string };
               const chunk = p.delta ?? p.text ?? "";
               if (chunk) controller.enqueue(encoder.encode(chunk));
@@ -56,6 +57,23 @@ export async function POST(req: Request) {
                 msg = String((e as { message: unknown }).message);
               else msg = JSON.stringify(e);
               controller.enqueue(encoder.encode(`\n\n⚠️ ${msg}`));
+            } else if (part.type === "finish") {
+              const usage = (part as unknown as {
+                usage?: {
+                  inputTokens?: number;
+                  outputTokens?: number;
+                  totalTokens?: number;
+                };
+              }).usage;
+              if (usage) {
+                const meta = JSON.stringify({
+                  type: "usage",
+                  model: body.model,
+                  inputTokens: usage.inputTokens ?? 0,
+                  outputTokens: usage.outputTokens ?? 0,
+                });
+                controller.enqueue(encoder.encode(`${meta}`));
+              }
             }
           }
         } catch (err) {

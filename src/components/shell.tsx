@@ -7,6 +7,7 @@ import { Welcome } from "./welcome";
 import { ModeView } from "./mode-view";
 import { HistoryView } from "./history-view";
 import { SettingsModal } from "./settings-modal";
+import { Toaster } from "./toaster";
 import { useAppStore } from "@/lib/store";
 
 export function Shell() {
@@ -30,6 +31,7 @@ export function Shell() {
         : <HistoryView mode={view.mode} />}
 
       <SettingsModal />
+      <Toaster />
     </div>
   );
 }
