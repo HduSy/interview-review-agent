@@ -23,7 +23,7 @@ function ActionButton({
   label: string;
   doneLabel?: string;
   variant?: "primary" | "secondary";
-  onAct: () => void | Promise<void>;
+  onAct: () => unknown | Promise<unknown>;
 }) {
   const [done, setDone] = useState(false);
   const cls =
@@ -179,9 +179,9 @@ function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
           />
           <ActionButton
             label="把要点存入画像"
-            onAct={() =>
-              pushToast(`已记录到画像 · ${data.rewrite.tag}`, "success")
-            }
+            onAct={() => {
+              pushToast(`已记录到画像 · ${data.rewrite.tag}`, "success");
+            }}
           />
         </div>
       )}
