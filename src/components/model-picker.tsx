@@ -23,6 +23,7 @@ export function ModelPicker() {
   const toggleAdaptiveThinking = useAppStore((s) => s.toggleAdaptiveThinking);
   const remoteModels = useAppStore((s) => s.availableModels);
   const modelsLoading = useAppStore((s) => s.modelsLoading);
+  const hasModels = remoteModels.length > 0;
 
   const open = useAppStore((s) => s.modelPickerOpen);
   const subOpen = useAppStore((s) => s.modelPickerSubOpen);
@@ -64,15 +65,18 @@ export function ModelPicker() {
       <button
         type="button"
         onPointerDown={(e) => {
+          if (!hasModels) return;
           e.preventDefault();
           toggleOpen();
         }}
         className={clsx(
-          "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[13px] text-body hover:bg-surface-card transition-colors uppercase tracking-[0.03em]",
+          "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[13px] transition-colors uppercase tracking-[0.03em]",
+          !hasModels && "text-muted-soft cursor-default",
+          hasModels && "text-body hover:bg-surface-card",
           open && "bg-surface-card",
         )}
       >
-        {selected.name}
+        {hasModels ? selected.name : "无可用模型"}
         <ChevronDown
           size={14}
           strokeWidth={1.8}
@@ -80,7 +84,7 @@ export function ModelPicker() {
         />
       </button>
 
-      {open && (
+      {hasModels && open && (
         <div className="absolute bottom-[calc(100%+8px)] right-0 z-30 w-[300px] bg-canvas border border-hairline rounded-xl shadow-[0_12px_32px_rgba(20,20,19,0.10),0_2px_6px_rgba(20,20,19,0.04)] p-1.5">
           <button
             type="button"

@@ -386,7 +386,7 @@ function ApiTab() {
             </span>
           ) : (
             <span className="text-muted-soft">
-              未拉取时聊天框沿用内置模型清单
+              配置 API Key 后查看可用模型
             </span>
           )}
         </div>

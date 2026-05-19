@@ -118,11 +118,8 @@ const PLACEHOLDER_AI_DELAY_MS = 600;
 
 function placeholderReply(userText: string, mode: ModeId): string {
   const preview = userText.length > 64 ? userText.slice(0, 60) + "…" : userText;
-  if (mode === "chat") {
-    return `收到 —「${preview}」。Phase 6 接入 Vercel AI SDK 后我会在这里给你真实流式回复。`;
-  }
-  if (mode === "mock") {
-    return `（/mock 占位）收到 —「${preview}」。等 Phase 6 接入模型后我会按面试官风格继续追问。`;
+  if (mode === "chat" || mode === "mock") {
+    return `收到 —「${preview}」。请先输入 /setting 配置模型。`;
   }
   return "";
 }
@@ -218,7 +215,12 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   updateApiConfig: async (patch) => {
     const next = await saveApiConfig(patch);
-    set({ apiConfig: next });
+    const keyChanged = "apiKey" in patch;
+    set({
+      apiConfig: next,
+      ...(keyChanged ? { availableModels: [], modelsError: null } : {}),
+    });
+    if (keyChanged && next.apiKey.trim()) void get().fetchModels();
   },
 
   changeProvider: async (provider: Provider) => {
