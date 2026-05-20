@@ -27,6 +27,8 @@ export function Composer({
   const sendUserMessage = useAppStore((s) => s.sendUserMessage);
   const profile = useAppStore((s) => s.profile);
   const openSettings = useAppStore((s) => s.openSettings);
+  const availableModels = useAppStore((s) => s.availableModels);
+  const hasModels = availableModels.length > 0;
 
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
@@ -66,6 +68,9 @@ export function Composer({
   }, [profile.resumeFileName, attachResume]);
 
   function pickCommand(c: CommandDef) {
+    // No models configured → only /settings is actionable. Other commands
+    // are disabled in the palette UI; intercept keyboard Enter too.
+    if (!hasModels && c.id !== "settings") return;
     setValue("");
     activateChatMode(c.id);
     textareaRef.current?.focus();
@@ -164,6 +169,7 @@ export function Composer({
             selectedIndex={selectedIndex}
             onPick={pickCommand}
             onHover={setSelectedIndex}
+            hasModels={hasModels}
           />
         )}
         <input

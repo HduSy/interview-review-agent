@@ -64,14 +64,16 @@ export function ModelPicker() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
+        disabled={!hasModels}
         onPointerDown={(e) => {
+          // HTML `disabled` only blocks `click` — pointerdown still fires.
           if (!hasModels) return;
           e.preventDefault();
           toggleOpen();
         }}
         className={clsx(
           "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[13px] transition-colors uppercase tracking-[0.03em]",
-          !hasModels && "text-muted-soft cursor-default",
+          !hasModels && "text-muted-soft",
           hasModels && "text-body hover:bg-surface-card",
           open && "bg-surface-card",
         )}

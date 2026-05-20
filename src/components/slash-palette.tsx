@@ -9,11 +9,13 @@ export function SlashPalette({
   selectedIndex,
   onPick,
   onHover,
+  hasModels,
 }: {
   commands: CommandDef[];
   selectedIndex: number;
   onPick: (cmd: CommandDef) => void;
   onHover: (index: number) => void;
+  hasModels: boolean;
 }) {
   return (
     <div
@@ -38,12 +40,14 @@ export function SlashPalette({
           commands.map((c, i) => {
             const Icon = c.icon;
             const active = i === selectedIndex;
+            const disabled = !hasModels && c.id !== "settings";
             return (
               <button
                 key={c.cmd}
                 type="button"
                 role="option"
                 aria-selected={active}
+                disabled={disabled}
                 onMouseEnter={() => onHover(i)}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -51,28 +55,35 @@ export function SlashPalette({
                 }}
                 className={clsx(
                   "flex items-center gap-3.5 px-3 py-2.5 rounded-lg mx-1 text-left transition-colors",
-                  active ? "bg-surface-card" : "hover:bg-surface-soft",
+                  disabled && "opacity-50",
+                  !disabled && (active ? "bg-surface-card" : "hover:bg-surface-soft"),
                 )}
               >
                 <Icon
                   size={16}
                   strokeWidth={1.6}
-                  className={active ? "text-primary" : "text-muted"}
+                  className={active && !disabled ? "text-primary" : "text-muted"}
                 />
                 <span
                   className={clsx(
                     "font-mono text-sm font-medium min-w-[96px]",
-                    active ? "text-ink" : "text-body-strong",
+                    active && !disabled ? "text-ink" : "text-body-strong",
                   )}
                 >
                   /{c.cmd}
                 </span>
                 <span className="text-[13px] text-muted flex-1">{c.desc}</span>
-                {active && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                    <ArrowRight size={10} strokeWidth={2} />
-                    激活 /{c.cmd}
+                {disabled ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted bg-surface-card px-2 py-0.5 rounded-full">
+                    需先 /settings
                   </span>
+                ) : (
+                  active && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      <ArrowRight size={10} strokeWidth={2} />
+                      激活 /{c.cmd}
+                    </span>
+                  )
                 )}
                 <kbd>{c.hot}</kbd>
               </button>

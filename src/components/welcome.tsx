@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { SpikeMark } from "./spike-mark";
 import { Composer } from "./composer";
 import { MessageList } from "./message-list";
@@ -8,7 +9,10 @@ import { useAppStore } from "@/lib/store";
 
 export function Welcome() {
   const activate = useAppStore((s) => s.activateChatMode);
+  const openSettings = useAppStore((s) => s.openSettings);
   const messages = useAppStore((s) => s.messages);
+  const availableModels = useAppStore((s) => s.availableModels);
+  const hasModels = availableModels.length > 0;
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden bg-canvas">
@@ -39,11 +43,21 @@ export function Welcome() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-2">
               {COMMANDS.map((c) => {
                 const Icon = c.icon;
+                const disabled = !hasModels && c.id !== "settings";
                 return (
                   <button
                     key={c.cmd}
-                    onClick={() => activate(c.id)}
-                    className="text-left bg-canvas border border-hairline rounded-xl p-4 flex flex-col gap-2 hover:border-primary/40 hover:bg-surface-soft transition-colors"
+                    disabled={disabled}
+                    onClick={() =>
+                      !hasModels ? openSettings("api") : activate(c.id)
+                    }
+                    title={disabled ? "无可用模型 — 请先配置 API Key" : undefined}
+                    className={clsx(
+                      "text-left bg-canvas border border-hairline rounded-xl p-4 flex flex-col gap-2 transition-colors",
+                      disabled
+                        ? "opacity-50"
+                        : "hover:border-primary/40 hover:bg-surface-soft",
+                    )}
                   >
                     <div className="flex items-center gap-2 text-primary">
                       <Icon size={14} strokeWidth={1.8} />

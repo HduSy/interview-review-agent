@@ -1,10 +1,10 @@
 "use client";
 
 import clsx from "clsx";
+import { useMemo } from "react";
 import { PanelLeft, Plus, Settings as SettingsIcon } from "lucide-react";
 import { Wordmark } from "./spike-mark";
 import { RAIL_MODES, type ModeId } from "@/lib/commands";
-import { HISTORY_STUB, RECENT_ITEMS } from "@/lib/history-stub";
 import { useAppStore } from "@/lib/store";
 
 export function ExpandedSidebar() {
@@ -13,13 +13,36 @@ export function ExpandedSidebar() {
   const collapseSidebar = useAppStore((s) => s.collapseSidebar);
   const newChat = useAppStore((s) => s.newChat);
   const openSettings = useAppStore((s) => s.openSettings);
-  const loadHistoryItem = useAppStore((s) => s.loadHistoryItem);
-  const chatMode = useAppStore((s) => s.chatMode);
+  const loadSession = useAppStore((s) => s.loadSession);
+  const currentSessionId = useAppStore((s) => s.currentSessionId);
+  const sessions = useAppStore((s) => s.sessions);
+
+  const sessionCountByMode = useMemo(() => {
+    const counts: Record<ModeId, number> = {
+      chat: 0,
+      mock: 0,
+      review: 0,
+      practice: 0,
+      predict: 0,
+      optimize: 0,
+    };
+    for (const s of sessions) counts[s.mode]++;
+    return counts;
+  }, [sessions]);
+
+  const totalSessions = sessions.length;
 
   return (
     <aside className="w-[248px] bg-surface-soft border-r border-hairline px-4 py-5 flex flex-col gap-1 shrink-0">
       <div className="flex items-center justify-between mb-4 px-1">
-        <Wordmark size={18} />
+        <button
+          onClick={newChat}
+          title="回到首页"
+          aria-label="回到首页"
+          className="-ml-1 px-1 py-1 rounded-md hover:bg-surface-card transition-colors"
+        >
+          <Wordmark size={18} />
+        </button>
         <button
           onClick={collapseSidebar}
           aria-label="收起侧栏"
@@ -44,8 +67,7 @@ export function ExpandedSidebar() {
         const isHistory = view.kind === "history" && view.mode === m.id;
         const isChat = view.kind === "chat" && m.id === "chat";
         const active = isHistory || isChat;
-        const count =
-          m.id === "chat" ? 12 : HISTORY_STUB[m.id as Exclude<ModeId, "chat">]?.length ?? 0;
+        const count = m.id === "chat" ? totalSessions : sessionCountByMode[m.id];
         return (
           <button
             key={m.id}
@@ -71,22 +93,30 @@ export function ExpandedSidebar() {
       <div className="text-[11px] font-medium tracking-[0.12em] uppercase text-muted-soft px-3 pb-1.5">
         Recent
       </div>
-      {RECENT_ITEMS.map((r) => {
-        const active = view.kind === "chat" && chatMode === r.mode;
-        return (
-          <button
-            key={`${r.mode}:${r.itemId}`}
-            onClick={() => loadHistoryItem(r.mode, r.itemId)}
-            title={`/${r.mode} · ${r.title}`}
-            className={clsx(
-              "px-3 py-1.5 rounded-md text-[13px] text-left whitespace-nowrap overflow-hidden text-ellipsis",
-              active ? "bg-surface-card text-ink" : "text-body hover:bg-surface-card",
-            )}
-          >
-            {r.title}
-          </button>
-        );
-      })}
+      {sessions.length === 0 ? (
+        <div className="px-3 py-2 text-[12px] text-muted-soft leading-relaxed">
+          还没有会话。发一句试试 —
+          <br />
+          这里会列出最近 6 条。
+        </div>
+      ) : (
+        sessions.slice(0, 6).map((s) => {
+          const active = view.kind === "chat" && currentSessionId === s.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => void loadSession(s.id)}
+              title={`/${s.mode} · ${s.title}`}
+              className={clsx(
+                "px-3 py-1.5 rounded-md text-[13px] text-left whitespace-nowrap overflow-hidden text-ellipsis",
+                active ? "bg-surface-card text-ink" : "text-body hover:bg-surface-card",
+              )}
+            >
+              {s.title}
+            </button>
+          );
+        })
+      )}
       <div className="flex-1" />
       <button
         onClick={() => openSettings()}

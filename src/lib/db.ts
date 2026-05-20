@@ -1,5 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import { PROVIDER_DEFAULT_URL, type Provider } from "./providers";
+import type { ModeId } from "./commands";
+import type { Message } from "./messages";
 
 export type { Provider };
 export { PROVIDER_DEFAULT_URL };
@@ -39,11 +41,21 @@ export type UsageRecord = {
   costUsd: number;
 };
 
+export type Session = {
+  id: string;
+  mode: ModeId;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+  updatedAt: number;
+};
+
 class OcReviewDB extends Dexie {
   profiles!: Table<Profile, string>;
   apiConfigs!: Table<ApiConfig, string>;
   resumes!: Table<ResumeBlob, string>;
   usage!: Table<UsageRecord, number>;
+  sessions!: Table<Session, string>;
 
   constructor() {
     super("oc-review");
@@ -52,6 +64,13 @@ class OcReviewDB extends Dexie {
       apiConfigs: "id",
       resumes: "id",
       usage: "++id, ts, model",
+    });
+    this.version(2).stores({
+      profiles: "id",
+      apiConfigs: "id",
+      resumes: "id",
+      usage: "++id, ts, model",
+      sessions: "id, mode, updatedAt",
     });
   }
 }
@@ -128,6 +147,22 @@ export type UsageStats = {
   totalCalls: number;
   recentRows: UsageRecord[];
 };
+
+export async function loadSessions(): Promise<Session[]> {
+  return db.sessions.orderBy("updatedAt").reverse().toArray();
+}
+
+export async function loadSessionById(id: string): Promise<Session | undefined> {
+  return db.sessions.get(id);
+}
+
+export async function upsertSession(s: Session): Promise<void> {
+  await db.sessions.put(s);
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await db.sessions.delete(id);
+}
 
 export async function loadUsageStats(): Promise<UsageStats> {
   const now = new Date();

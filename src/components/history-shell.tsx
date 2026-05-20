@@ -2,7 +2,7 @@
 
 import { Search, X } from "lucide-react";
 import clsx from "clsx";
-import type { HistoryMeta, StatBadge } from "@/lib/history-stub";
+import type { HistoryMeta, StatBadge } from "@/lib/history-meta";
 import type { ModeId } from "@/lib/commands";
 
 export function HistoryShell({

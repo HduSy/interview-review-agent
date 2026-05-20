@@ -18,27 +18,22 @@ import {
   PROVIDER_DEFAULT_URL,
   loadApiConfig,
   loadProfile,
+  loadSessionById,
+  loadSessions,
   saveApiConfig,
   saveProfile,
   saveResume,
   deleteResume,
   recordUsage,
   loadUsageStats,
+  upsertSession,
+  deleteSession,
   type ApiConfig,
   type Profile,
   type Provider,
+  type Session,
   type UsageStats,
 } from "./db";
-import {
-  HISTORY_STUB,
-  type HistoryItem,
-  type MockHistoryItem,
-  type OptimizeHistoryItem,
-  type PracticeHistoryItem,
-  type PredictHistoryItem,
-  type ReviewHistoryItem,
-} from "./history-stub";
-
 export type SettingsTab = "profile" | "api" | "usage";
 
 export type ToastKind = "success" | "info" | "error";
@@ -64,6 +59,8 @@ type State = {
   modelPickerOpen: boolean;
   modelPickerSubOpen: boolean;
   messages: Message[];
+  sessions: Session[];
+  currentSessionId: string | null;
   profile: Profile;
   apiConfig: ApiConfig;
   hydrated: boolean;
@@ -106,7 +103,8 @@ type Actions = {
 
   sendUserMessage: (content: string) => void;
   appendIntroIfEmpty: (mode: ModeId) => void;
-  loadHistoryItem: (mode: Exclude<ModeId, "chat">, itemId: string) => void;
+  loadSession: (id: string) => Promise<void>;
+  deleteCurrentSession: () => Promise<void>;
 
   refreshUsage: () => Promise<void>;
 
@@ -165,6 +163,8 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   modelPickerOpen: false,
   modelPickerSubOpen: false,
   messages: [],
+  sessions: [],
+  currentSessionId: null,
   profile: DEFAULT_PROFILE,
   apiConfig: DEFAULT_API_CONFIG,
   hydrated: false,
@@ -181,6 +181,11 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     }
     set({ chatMode: id, view: { kind: "chat" } });
     if (id !== "chat") get().appendIntroIfEmpty(id);
+    // If there's already a persisted session, keep its mode in sync.
+    const { currentSessionId, messages } = get();
+    if (currentSessionId && messages.some((m) => m.role === "user")) {
+      void persistCurrentSession();
+    }
   },
 
   selectSidebarMode: (id) => {
@@ -196,6 +201,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       view: { kind: "chat" },
       chatMode: "chat",
       messages: [],
+      currentSessionId: null,
     }),
 
   openSettings: (tab) => set({ settingsOpen: true, settingsTab: tab ?? "profile" }),
@@ -204,8 +210,12 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   hydrate: async () => {
     if (get().hydrated) return;
-    const [profile, apiConfig] = await Promise.all([loadProfile(), loadApiConfig()]);
-    set({ profile, apiConfig, hydrated: true });
+    const [profile, apiConfig, sessions] = await Promise.all([
+      loadProfile(),
+      loadApiConfig(),
+      loadSessions(),
+    ]);
+    set({ profile, apiConfig, sessions, hydrated: true });
   },
 
   updateProfile: async (patch) => {
@@ -331,15 +341,29 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   dismissToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
-  loadHistoryItem: (mode, itemId) => {
-    const items = HISTORY_STUB[mode] as HistoryItem[];
-    const item = items.find((i) => i.id === itemId);
-    if (!item) return;
+  loadSession: async (id) => {
+    const cached = get().sessions.find((s) => s.id === id);
+    const session = cached ?? (await loadSessionById(id));
+    if (!session) return;
     set({
       view: { kind: "chat" },
-      chatMode: mode,
-      messages: messagesFromHistoryItem(item),
+      chatMode: session.mode,
+      messages: session.messages,
+      currentSessionId: session.id,
     });
+  },
+
+  deleteCurrentSession: async () => {
+    const id = get().currentSessionId;
+    if (!id) return;
+    await deleteSession(id);
+    set((s) => ({
+      sessions: s.sessions.filter((x) => x.id !== id),
+      messages: [],
+      currentSessionId: null,
+      view: { kind: "chat" },
+      chatMode: "chat",
+    }));
   },
 
   appendIntroIfEmpty: (mode) => {
@@ -384,6 +408,9 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       createdAt: Date.now() + 1,
     };
     set({ messages: [...prev, userMsg, pending] });
+    // Persist the session as soon as the user commits a message — locks
+    // in createdAt / title from the very first turn.
+    void persistCurrentSession();
 
     if (apiConfig.apiKey.trim()) {
       void streamReply({
@@ -410,6 +437,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
             : m,
         ),
       }));
+      void persistCurrentSession();
     }, PLACEHOLDER_AI_DELAY_MS);
   },
 }));
@@ -479,6 +507,7 @@ async function streamReply({
             : m,
         ),
       }));
+      void persistCurrentSession();
       return;
     }
 
@@ -536,6 +565,7 @@ async function streamReply({
         }),
       }));
     }
+    void persistCurrentSession();
 
     // Record token usage emitted by the server's `finish` event.
     if (trailer) {
@@ -564,117 +594,45 @@ async function streamReply({
           : m,
       ),
     }));
+    void persistCurrentSession();
   }
 }
 
-function messagesFromHistoryItem(item: HistoryItem): Message[] {
-  const baseTs = Date.now();
-  switch (item.kind) {
-    case "mock": {
-      const m = item as MockHistoryItem;
-      return [
-        {
-          id: makeId(),
-          role: "user",
-          content: `开始 ${m.co} 的模拟面试 — ${m.role}，重点放在 ${m.round}。`,
-          mode: "mock",
-          createdAt: baseTs,
-        },
-        {
-          id: makeId(),
-          role: "assistant",
-          content: `好。我们这一轮按 ${m.round} 走，时间预算约 ${m.duration}。先用一个 system design 的题切入：在 ${m.co} 内部产品里，你会怎么设计一个支持多团队协作的实时编辑系统？\n\n（这是历史会话快照 · 评级 ${m.grade}）`,
-          mode: "mock",
-          createdAt: baseTs + 1,
-        },
-      ];
-    }
-    case "review": {
-      const r = item as ReviewHistoryItem;
-      return [
-        {
-          id: makeId(),
-          role: "user",
-          content: `${r.source}\n\n"面试官：聊一下你最难的一次跨团队协作…\n我：当时我们要推一个埋点规范，涉及 5 个业务线。我先去找了各业务的负责人聊…"`,
-          mode: "review",
-          createdAt: baseTs,
-        },
-        {
-          id: makeId(),
-          role: "assistant",
-          content: `${r.co} · ${r.round} 复盘已完成。整体评级取决于 ${r.top}，详见下方维度卡。`,
-          mode: "review",
-          createdAt: baseTs + 1,
-          payload: DEMO_REVIEW,
-        },
-      ];
-    }
-    case "practice": {
-      const p = item as PracticeHistoryItem;
-      return [
-        {
-          id: makeId(),
-          role: "assistant",
-          content: `（第 ${p.n} 题 · ${p.type} · 用时 ${p.duration} · 评级 ${p.rating}）`,
-          mode: "practice",
-          createdAt: baseTs,
-          payload: {
-            ...DEMO_PRACTICE,
-            title: p.q,
-            category: p.type,
-            difficulty: DEMO_PRACTICE.difficulty,
-            estimated: `预计 ${p.duration}`,
-            track: DEMO_PRACTICE.track,
-          },
-        },
-      ];
-    }
-    case "predict": {
-      const f = item as PredictHistoryItem;
-      return [
-        {
-          id: makeId(),
-          role: "user",
-          content: `基于 ${f.title} 的 JD + 我的简历，预测可能的面试题。`,
-          mode: "predict",
-          createdAt: baseTs,
-        },
-        {
-          id: makeId(),
-          role: "assistant",
-          content: `已生成 ${f.total} 道预测题，目前命中 ${f.hit} 题、${f.pending} 待验证。`,
-          mode: "predict",
-          createdAt: baseTs + 1,
-          payload: { ...DEMO_PREDICT, context: f.basis, hottest: f.hottest, total: f.total },
-        },
-      ];
-    }
-    case "optimize": {
-      const o = item as OptimizeHistoryItem;
-      return [
-        {
-          id: makeId(),
-          role: "user",
-          content: o.before,
-          mode: "optimize",
-          createdAt: baseTs,
-        },
-        {
-          id: makeId(),
-          role: "assistant",
-          content: `改写完了 — 主轴 ${o.tag}，下面是 Before / After 对照。`,
-          mode: "optimize",
-          createdAt: baseTs + 1,
-          payload: {
-            ...DEMO_OPTIMIZE,
-            question: o.q,
-            tag: o.tag,
-            before: o.before,
-            after: o.after,
-          },
-        },
-      ];
-    }
+async function persistCurrentSession(): Promise<void> {
+  const state = useAppStore.getState();
+  const { messages, chatMode, currentSessionId, sessions } = state;
+  const firstUser = messages.find((m) => m.role === "user" && m.content.trim());
+  if (!firstUser) return;
+  const now = Date.now();
+  const titleSource = firstUser.content.trim();
+  const title =
+    titleSource.length > 40 ? titleSource.slice(0, 38) + "…" : titleSource;
+  let id = currentSessionId;
+  let createdAt = now;
+  if (id) {
+    const existing = sessions.find((s) => s.id === id);
+    if (existing) createdAt = existing.createdAt;
+  } else {
+    id = makeId();
+    useAppStore.setState({ currentSessionId: id });
+  }
+  const session: Session = {
+    id,
+    mode: chatMode,
+    title,
+    messages,
+    createdAt,
+    updatedAt: now,
+  };
+  try {
+    await upsertSession(session);
+    useAppStore.setState((s) => {
+      const without = s.sessions.filter((x) => x.id !== session.id);
+      return { sessions: [session, ...without] };
+    });
+  } catch (err) {
+    // Persistence is best-effort — never crash the UI for a write failure.
+    console.error("[session persist]", err);
   }
 }
 
