@@ -69,6 +69,14 @@ type State = {
   modelsError: string | null;
   usageStats: UsageStats | null;
   toasts: Toast[];
+  githubUser: GithubUser | null;
+  authChecked: boolean;
+};
+
+export type GithubUser = {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
 };
 
 type Actions = {
@@ -107,6 +115,8 @@ type Actions = {
   deleteCurrentSession: () => Promise<void>;
 
   refreshUsage: () => Promise<void>;
+
+  loadGithubUser: () => Promise<void>;
 
   pushToast: (text: string, kind?: ToastKind, durationMs?: number) => string;
   dismissToast: (id: string) => void;
@@ -173,6 +183,8 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   modelsError: null,
   usageStats: null,
   toasts: [],
+  githubUser: null,
+  authChecked: false,
 
   activateChatMode: (id) => {
     if (id === "settings") {
@@ -335,6 +347,20 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   refreshUsage: async () => {
     const stats = await loadUsageStats();
     set({ usageStats: stats });
+  },
+
+  loadGithubUser: async () => {
+    try {
+      const res = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!res.ok) {
+        set({ githubUser: null, authChecked: true });
+        return;
+      }
+      const data = (await res.json()) as { user: GithubUser | null };
+      set({ githubUser: data.user, authChecked: true });
+    } catch {
+      set({ githubUser: null, authChecked: true });
+    }
   },
 
   pushToast: (text, kind = "info", durationMs = 3200) => {

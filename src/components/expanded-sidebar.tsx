@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { useMemo } from "react";
-import { PanelLeft, Plus, Settings as SettingsIcon } from "lucide-react";
+import { Github, PanelLeft, Plus, Settings as SettingsIcon } from "lucide-react";
 import { Wordmark } from "./spike-mark";
 import { RAIL_MODES, type ModeId } from "@/lib/commands";
 import { useAppStore } from "@/lib/store";
@@ -16,6 +16,8 @@ export function ExpandedSidebar() {
   const loadSession = useAppStore((s) => s.loadSession);
   const currentSessionId = useAppStore((s) => s.currentSessionId);
   const sessions = useAppStore((s) => s.sessions);
+  const githubUser = useAppStore((s) => s.githubUser);
+  const authChecked = useAppStore((s) => s.authChecked);
 
   const sessionCountByMode = useMemo(() => {
     const counts: Record<ModeId, number> = {
@@ -118,19 +120,56 @@ export function ExpandedSidebar() {
         })
       )}
       <div className="flex-1" />
-      <button
-        onClick={() => openSettings()}
-        className="flex items-center gap-2.5 p-2.5 rounded-md bg-canvas border border-hairline hover:bg-surface-card transition-colors text-left"
-      >
-        <div className="w-7 h-7 rounded-full bg-surface-dark text-on-dark flex items-center justify-center text-[11px] font-medium shrink-0">
-          YT
+      {/* Auth state is intentionally separate from the rest of the app —
+          unlogged users see "未登录" + a GitHub link. Settings always works. */}
+      {githubUser ? (
+        <button
+          onClick={() => openSettings()}
+          className="flex items-center gap-2.5 p-2.5 rounded-md bg-canvas border border-hairline hover:bg-surface-card transition-colors text-left"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={githubUser.avatarUrl}
+            alt={githubUser.login}
+            className="w-7 h-7 rounded-full shrink-0 object-cover bg-surface-card"
+          />
+          <div className="flex flex-col leading-tight flex-1 min-w-0">
+            <span className="text-[13px] text-ink font-medium truncate">
+              {githubUser.name || githubUser.login}
+            </span>
+            <span className="font-mono text-[11px] text-muted truncate">
+              @{githubUser.login}
+            </span>
+          </div>
+          <SettingsIcon size={15} strokeWidth={1.6} className="text-muted shrink-0" />
+        </button>
+      ) : (
+        <div className="flex items-center gap-2.5 p-2.5 rounded-md bg-canvas border border-hairline text-left">
+          <div className="w-7 h-7 rounded-full bg-surface-card text-muted flex items-center justify-center shrink-0">
+            <Github size={14} strokeWidth={1.6} />
+          </div>
+          <div className="flex flex-col leading-tight flex-1 min-w-0">
+            {authChecked ? (
+              <a
+                href="/api/auth/github"
+                className="text-[13px] text-primary font-medium hover:underline self-start"
+              >
+                登录 GitHub
+              </a>
+            ) : (
+              <span className="text-[13px] text-muted-soft">…</span>
+            )}
+          </div>
+          <button
+            onClick={() => openSettings()}
+            aria-label="打开设置"
+            title="打开设置"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-muted hover:bg-surface-card shrink-0"
+          >
+            <SettingsIcon size={15} strokeWidth={1.6} />
+          </button>
         </div>
-        <div className="flex flex-col leading-tight flex-1 min-w-0">
-          <span className="text-[13px] text-ink font-medium">Yuxin Tao</span>
-          <span className="font-mono text-[11px] text-muted truncate">claude-sonnet-4.5</span>
-        </div>
-        <SettingsIcon size={15} strokeWidth={1.6} className="text-muted" />
-      </button>
+      )}
     </aside>
   );
 }

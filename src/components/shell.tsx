@@ -15,10 +15,12 @@ export function Shell() {
   const chatMode = useAppStore((s) => s.chatMode);
   const sidebarExpanded = useAppStore((s) => s.sidebarExpanded);
   const hydrate = useAppStore((s) => s.hydrate);
+  const loadGithubUser = useAppStore((s) => s.loadGithubUser);
 
   useEffect(() => {
     void hydrate();
-  }, [hydrate]);
+    void loadGithubUser();
+  }, [hydrate, loadGithubUser]);
 
   return (
     <div className="h-screen flex bg-canvas text-ink overflow-hidden">

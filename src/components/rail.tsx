@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeft, Settings as SettingsIcon } from "lucide-react";
+import { Github, PanelLeft, Settings as SettingsIcon } from "lucide-react";
 import clsx from "clsx";
 import { RAIL_MODES } from "@/lib/commands";
 import { useAppStore } from "@/lib/store";
@@ -11,6 +11,8 @@ export function Rail() {
   const selectSidebarMode = useAppStore((s) => s.selectSidebarMode);
   const openSettings = useAppStore((s) => s.openSettings);
   const expandSidebar = useAppStore((s) => s.expandSidebar);
+  const githubUser = useAppStore((s) => s.githubUser);
+  const authChecked = useAppStore((s) => s.authChecked);
 
   const activeMode = view.kind === "history" ? view.mode : "chat";
 
@@ -56,13 +58,33 @@ export function Rail() {
       >
         <SettingsIcon size={18} strokeWidth={1.6} />
       </button>
-      <button
-        onClick={() => openSettings()}
-        title="打开画像设置"
-        className="w-8 h-8 rounded-full bg-surface-dark text-on-dark flex items-center justify-center text-xs font-medium mt-1.5 hover:opacity-90"
-      >
-        YT
-      </button>
+      {githubUser ? (
+        <button
+          onClick={() => openSettings()}
+          title={`@${githubUser.login} · 打开设置`}
+          className="w-8 h-8 rounded-full overflow-hidden bg-surface-card mt-1.5 hover:opacity-90"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={githubUser.avatarUrl}
+            alt={githubUser.login}
+            className="w-full h-full object-cover"
+          />
+        </button>
+      ) : (
+        <a
+          href={authChecked ? "/api/auth/github" : undefined}
+          title={authChecked ? "登录 GitHub" : ""}
+          className={clsx(
+            "w-8 h-8 rounded-full flex items-center justify-center mt-1.5 transition-colors",
+            authChecked
+              ? "bg-surface-card text-muted hover:bg-surface-cream-strong hover:text-ink"
+              : "bg-surface-card text-muted-soft",
+          )}
+        >
+          <Github size={14} strokeWidth={1.8} />
+        </a>
+      )}
     </aside>
   );
 }
