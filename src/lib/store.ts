@@ -181,9 +181,11 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     }
     set({ chatMode: id, view: { kind: "chat" } });
     if (id !== "chat") get().appendIntroIfEmpty(id);
-    // If there's already a persisted session, keep its mode in sync.
-    const { currentSessionId, messages } = get();
-    if (currentSessionId && messages.some((m) => m.role === "user")) {
+    // Sync the session's mode only if it has already been persisted
+    // (i.e. a stream completed for this session). Otherwise wait — the
+    // initial write comes from streamReply on completion.
+    const { currentSessionId, sessions } = get();
+    if (currentSessionId && sessions.some((s) => s.id === currentSessionId)) {
       void persistCurrentSession();
     }
   },
@@ -210,12 +212,20 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   hydrate: async () => {
     if (get().hydrated) return;
-    const [profile, apiConfig, sessions] = await Promise.all([
+    const [profile, apiConfig, rawSessions] = await Promise.all([
       loadProfile(),
       loadApiConfig(),
       loadSessions(),
     ]);
+    // Any `pending: true` message in a loaded session is a leftover from
+    // a stream that never finished writing back (e.g. user navigated
+    // away mid-stream, or a tab crash). Drop it so the session doesn't
+    // re-open with a forever-loading bubble.
+    const sessions = await scrubStalePendingMessages(rawSessions);
     set({ profile, apiConfig, sessions, hydrated: true });
+    // `availableModels` is in-memory only — re-fetch on every page load
+    // so the model picker doesn't render "无可用模型" with a valid key.
+    if (apiConfig.apiKey.trim()) void get().fetchModels();
   },
 
   updateProfile: async (patch) => {
@@ -390,7 +400,20 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   sendUserMessage: (content) => {
     const text = content.trim();
     if (!text) return;
-    const { chatMode: mode, apiConfig, modelId, profile, messages: prev } = get();
+    const {
+      chatMode: mode,
+      apiConfig,
+      modelId,
+      profile,
+      messages: prev,
+      currentSessionId,
+    } = get();
+
+    // Allocate session id synchronously so streamReply can persist
+    // directly to it even if the user navigates away mid-stream.
+    const sessionId = currentSessionId ?? makeId();
+    if (!currentSessionId) set({ currentSessionId: sessionId });
+
     const userMsg: Message = {
       id: makeId(),
       role: "user",
@@ -408,12 +431,13 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       createdAt: Date.now() + 1,
     };
     set({ messages: [...prev, userMsg, pending] });
-    // Persist the session as soon as the user commits a message — locks
-    // in createdAt / title from the very first turn.
-    void persistCurrentSession();
+    // Persistence is deferred to the stream / placeholder completion. If
+    // the user exits the session before then, the half-baked turn is
+    // intentionally discarded and never lands in DB.
 
     if (apiConfig.apiKey.trim()) {
       void streamReply({
+        sessionId,
         pendingId,
         mode,
         userText: text,
@@ -437,12 +461,16 @@ export const useAppStore = create<State & Actions>((set, get) => ({
             : m,
         ),
       }));
-      void persistCurrentSession();
+      // Skip persist if the user navigated away during the 600ms delay.
+      if (useAppStore.getState().currentSessionId === sessionId) {
+        void persistCurrentSession();
+      }
     }, PLACEHOLDER_AI_DELAY_MS);
   },
 }));
 
 async function streamReply({
+  sessionId,
   pendingId,
   mode,
   priorMessages,
@@ -451,6 +479,7 @@ async function streamReply({
   profile,
   set,
 }: {
+  sessionId: string;
   pendingId: string;
   mode: ModeId;
   userText: string;
@@ -472,15 +501,32 @@ async function streamReply({
     modelId,
     apiConfig.modelOverride,
   );
-  const apiMessages = normalizeForApi(priorMessages);
-  if (apiMessages.length === 0) {
+
+  function applyAssistant(patch: Partial<Message>) {
     set((s) => ({
       messages: s.messages.map((m) =>
-        m.id === pendingId
-          ? { ...m, content: "⚠️ 还没有可发送的用户消息", pending: false }
-          : m,
+        m.id === pendingId ? { ...m, ...patch, pending: false } : m,
       ),
     }));
+  }
+
+  function persist() {
+    const state = useAppStore.getState();
+    // If the user navigated away from this session before the stream
+    // finished, drop the result — by design, half-finished turns never
+    // land in DB.
+    if (state.currentSessionId !== sessionId) return;
+    void writeSession({
+      sessionId,
+      mode,
+      messages: state.messages,
+    });
+  }
+
+  const apiMessages = normalizeForApi(priorMessages);
+  if (apiMessages.length === 0) {
+    applyAssistant({ content: "⚠️ 还没有可发送的用户消息" });
+    persist();
     return;
   }
 
@@ -500,14 +546,8 @@ async function streamReply({
 
     if (!res.ok || !res.body) {
       const errText = await res.text().catch(() => "请求失败");
-      set((s) => ({
-        messages: s.messages.map((m) =>
-          m.id === pendingId
-            ? { ...m, content: `⚠️ ${errText}`, pending: false }
-            : m,
-        ),
-      }));
-      void persistCurrentSession();
+      applyAssistant({ content: `⚠️ ${errText}` });
+      persist();
       return;
     }
 
@@ -521,20 +561,11 @@ async function streamReply({
       acc += decoder.decode(value, { stream: true });
       const { displayText } = stripUsageTrailer(acc);
       const partial = spec?.parsePartial(displayText) ?? null;
-      set((s) => ({
-        messages: s.messages.map((m) =>
-          m.id === pendingId
-            ? partial
-              ? {
-                  ...m,
-                  content: partial.summary,
-                  payload: partial.payload,
-                  pending: false,
-                }
-              : { ...m, content: displayText, payload: undefined, pending: false }
-            : m,
-        ),
-      }));
+      if (partial) {
+        applyAssistant({ content: partial.summary, payload: partial.payload });
+      } else {
+        applyAssistant({ content: displayText, payload: undefined });
+      }
     }
     acc += decoder.decode();
     const { displayText: finalText, trailer } = stripUsageTrailer(acc);
@@ -542,21 +573,13 @@ async function streamReply({
     // Final pass: strict parse confirms all required fields landed.
     const finalParsed = spec?.parse(finalText) ?? null;
     if (finalParsed) {
-      set((s) => ({
-        messages: s.messages.map((m) =>
-          m.id === pendingId
-            ? {
-                ...m,
-                content: finalParsed.summary,
-                payload: finalParsed.payload,
-                pending: false,
-              }
-            : m,
-        ),
-      }));
+      applyAssistant({
+        content: finalParsed.summary,
+        payload: finalParsed.payload,
+      });
     } else {
-      // Strict parse failed — keep whatever partial state we ended on, or
-      // fall through to plain text if no schema ever appeared.
+      // Strict parse failed — keep mid-stream partial payload if any,
+      // otherwise fall back to plain accumulated text.
       set((s) => ({
         messages: s.messages.map((m) => {
           if (m.id !== pendingId) return m;
@@ -565,7 +588,7 @@ async function streamReply({
         }),
       }));
     }
-    void persistCurrentSession();
+    persist();
 
     // Record token usage emitted by the server's `finish` event.
     if (trailer) {
@@ -587,41 +610,34 @@ async function streamReply({
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === pendingId
-          ? { ...m, content: `⚠️ 调用失败：${msg}`, pending: false }
-          : m,
-      ),
-    }));
-    void persistCurrentSession();
+    applyAssistant({ content: `⚠️ 调用失败：${msg}` });
+    persist();
   }
 }
 
-async function persistCurrentSession(): Promise<void> {
-  const state = useAppStore.getState();
-  const { messages, chatMode, currentSessionId, sessions } = state;
-  const firstUser = messages.find((m) => m.role === "user" && m.content.trim());
+async function writeSession(input: {
+  sessionId: string;
+  mode: ModeId;
+  messages: Message[];
+}): Promise<void> {
+  // `pending: true` placeholders are UI-only loading bubbles — never persist.
+  const clean = input.messages.filter((m) => !m.pending);
+  const firstUser = clean.find(
+    (m) => m.role === "user" && m.content.trim(),
+  );
   if (!firstUser) return;
-  const now = Date.now();
   const titleSource = firstUser.content.trim();
   const title =
     titleSource.length > 40 ? titleSource.slice(0, 38) + "…" : titleSource;
-  let id = currentSessionId;
-  let createdAt = now;
-  if (id) {
-    const existing = sessions.find((s) => s.id === id);
-    if (existing) createdAt = existing.createdAt;
-  } else {
-    id = makeId();
-    useAppStore.setState({ currentSessionId: id });
-  }
+  const state = useAppStore.getState();
+  const existing = state.sessions.find((s) => s.id === input.sessionId);
+  const now = Date.now();
   const session: Session = {
-    id,
-    mode: chatMode,
+    id: input.sessionId,
+    mode: input.mode,
     title,
-    messages,
-    createdAt,
+    messages: clean,
+    createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
   try {
@@ -634,6 +650,39 @@ async function persistCurrentSession(): Promise<void> {
     // Persistence is best-effort — never crash the UI for a write failure.
     console.error("[session persist]", err);
   }
+}
+
+async function persistCurrentSession(): Promise<void> {
+  const { currentSessionId, chatMode, messages } = useAppStore.getState();
+  if (!currentSessionId) return;
+  await writeSession({
+    sessionId: currentSessionId,
+    mode: chatMode,
+    messages,
+  });
+}
+
+async function scrubStalePendingMessages(
+  sessions: Session[],
+): Promise<Session[]> {
+  const result: Session[] = [];
+  for (const s of sessions) {
+    if (!s.messages.some((m) => m.pending)) {
+      result.push(s);
+      continue;
+    }
+    const cleaned: Session = {
+      ...s,
+      messages: s.messages.filter((m) => !m.pending),
+    };
+    try {
+      await upsertSession(cleaned);
+    } catch (err) {
+      console.error("[scrub stale pending]", err);
+    }
+    result.push(cleaned);
+  }
+  return result;
 }
 
 /**
