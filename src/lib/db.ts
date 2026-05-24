@@ -18,12 +18,19 @@ export type Profile = {
   updatedAt: number;
 };
 
+export type ProviderConfigSlice = {
+  apiKey: string;
+  baseURL?: string;
+  modelOverride?: string;
+};
+
 export type ApiConfig = {
   id: "default";
   provider: Provider;
   apiKey: string;
   baseURL?: string;
   modelOverride?: string;
+  byProvider?: Partial<Record<Provider, ProviderConfigSlice>>;
   updatedAt: number;
 };
 

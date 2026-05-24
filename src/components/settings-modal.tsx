@@ -301,8 +301,7 @@ const PROVIDERS: { id: Provider; label: string; hint: string }[] = [
   { id: "openai", label: "OpenAI", hint: "GPT-4 / o-series" },
   { id: "google", label: "Google", hint: "Gemini 系列" },
   { id: "zhipu", label: "智谱", hint: "GLM 系列 · 国内直连" },
-  { id: "azure-openai", label: "Azure OpenAI", hint: "企业部署" },
-  { id: "custom", label: "Custom", hint: "OpenAI 兼容端点" },
+  { id: "custom", label: "Custom", hint: "OpenAI/Anthropic 兼容端点" },
 ];
 
 function ApiTab() {

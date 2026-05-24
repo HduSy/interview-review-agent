@@ -31,6 +31,7 @@ import {
   type ApiConfig,
   type Profile,
   type Provider,
+  type ProviderConfigSlice,
   type Session,
   type UsageStats,
 } from "./db";
@@ -246,7 +247,25 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   },
 
   updateApiConfig: async (patch) => {
-    const next = await saveApiConfig(patch);
+    const current = get().apiConfig;
+    // Persist patched fields into the per-provider slice as well, so
+    // switching providers can restore exactly what the user typed.
+    const slice = current.byProvider?.[current.provider] ?? {
+      apiKey: current.apiKey,
+      baseURL: current.baseURL,
+      modelOverride: current.modelOverride,
+    };
+    const sliceNext: ProviderConfigSlice = {
+      apiKey: "apiKey" in patch ? (patch.apiKey ?? "") : slice.apiKey,
+      baseURL: "baseURL" in patch ? patch.baseURL : slice.baseURL,
+      modelOverride:
+        "modelOverride" in patch ? patch.modelOverride : slice.modelOverride,
+    };
+    const byProvider = {
+      ...(current.byProvider ?? {}),
+      [current.provider]: sliceNext,
+    };
+    const next = await saveApiConfig({ ...patch, byProvider });
     const keyChanged = "apiKey" in patch;
     set({
       apiConfig: next,
@@ -257,13 +276,36 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   changeProvider: async (provider: Provider) => {
     const current = get().apiConfig;
-    const currentIsDefault =
-      !current.baseURL ||
-      Object.values(PROVIDER_DEFAULT_URL).includes(current.baseURL);
-    const nextBaseURL = currentIsDefault
-      ? PROVIDER_DEFAULT_URL[provider]
-      : current.baseURL;
-    const next = await saveApiConfig({ provider, baseURL: nextBaseURL });
+    if (current.provider === provider) return;
+
+    // 1) Snapshot current fields back into the OLD provider's slice so
+    //    switching away and back round-trips losslessly.
+    const oldSlice: ProviderConfigSlice = {
+      apiKey: current.apiKey,
+      baseURL: current.baseURL,
+      modelOverride: current.modelOverride,
+    };
+    const byProvider = {
+      ...(current.byProvider ?? {}),
+      [current.provider]: oldSlice,
+    };
+
+    // 2) Hydrate fields for the NEW provider. If never configured, reset
+    //    to an empty form (default baseURL only).
+    const saved = byProvider[provider];
+    const nextFields: ProviderConfigSlice = saved ?? {
+      apiKey: "",
+      baseURL: PROVIDER_DEFAULT_URL[provider],
+      modelOverride: undefined,
+    };
+
+    const next = await saveApiConfig({
+      provider,
+      apiKey: nextFields.apiKey,
+      baseURL: nextFields.baseURL,
+      modelOverride: nextFields.modelOverride,
+      byProvider,
+    });
     set({ apiConfig: next, availableModels: [], modelsError: null });
     if (next.apiKey.trim()) void get().fetchModels();
   },

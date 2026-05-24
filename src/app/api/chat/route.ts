@@ -2,7 +2,11 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, type ModelMessage } from "ai";
-import type { Provider } from "@/lib/providers";
+import {
+  normalizeAnthropicBaseURL,
+  resolveWireProtocol,
+  type Provider,
+} from "@/lib/providers";
 
 export const runtime = "edge";
 
@@ -98,18 +102,29 @@ export async function POST(req: Request) {
 }
 
 function makeModel({ provider, apiKey, baseURL, model }: Body) {
-  switch (provider) {
+  const wire = resolveWireProtocol(provider, baseURL);
+  switch (wire) {
     case "anthropic": {
+      // Custom proxies often forget the /v1 segment that the Anthropic SDK
+      // assumes — normalize so `${base}/messages` resolves correctly.
+      const effectiveBase =
+        provider === "custom" && baseURL
+          ? normalizeAnthropicBaseURL(baseURL)
+          : baseURL;
       const factory = createAnthropic({
+        apiKey,
+        ...(effectiveBase ? { baseURL: effectiveBase } : {}),
+      });
+      return factory(model);
+    }
+    case "google": {
+      const factory = createGoogleGenerativeAI({
         apiKey,
         ...(baseURL ? { baseURL } : {}),
       });
       return factory(model);
     }
-    case "openai":
-    case "azure-openai":
-    case "zhipu":
-    case "custom": {
+    case "openai": {
       const factory = createOpenAI({
         apiKey,
         ...(baseURL ? { baseURL } : {}),
@@ -118,13 +133,6 @@ function makeModel({ provider, apiKey, baseURL, model }: Body) {
       // the new Responses API — third-party OpenAI-compatible providers
       // (Zhipu / DeepSeek / Moonshot / Azure) only implement the former.
       return factory.chat(model);
-    }
-    case "google": {
-      const factory = createGoogleGenerativeAI({
-        apiKey,
-        ...(baseURL ? { baseURL } : {}),
-      });
-      return factory(model);
     }
   }
 }
