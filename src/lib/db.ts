@@ -106,11 +106,14 @@ export async function loadProfile(): Promise<Profile> {
   return p ?? DEFAULT_PROFILE;
 }
 
-export async function saveProfile(patch: Partial<Profile>): Promise<Profile> {
-  const current = await loadProfile();
-  const next: Profile = { ...current, ...patch, id: "me", updatedAt: Date.now() };
-  await db.profiles.put(next);
-  return next;
+/**
+ * Persist the *full* profile. Callers are responsible for computing the
+ * next state from the in-memory source of truth (the zustand store) — we
+ * deliberately do NOT read-modify-write from Dexie here because that
+ * pattern races with concurrent updates and silently drops fields.
+ */
+export async function saveProfile(profile: Profile): Promise<void> {
+  await db.profiles.put(profile);
 }
 
 export async function loadApiConfig(): Promise<ApiConfig> {
@@ -118,11 +121,9 @@ export async function loadApiConfig(): Promise<ApiConfig> {
   return c ?? DEFAULT_API_CONFIG;
 }
 
-export async function saveApiConfig(patch: Partial<ApiConfig>): Promise<ApiConfig> {
-  const current = await loadApiConfig();
-  const next: ApiConfig = { ...current, ...patch, id: "default", updatedAt: Date.now() };
-  await db.apiConfigs.put(next);
-  return next;
+/** See saveProfile — same race-avoidance rationale. */
+export async function saveApiConfig(config: ApiConfig): Promise<void> {
+  await db.apiConfigs.put(config);
 }
 
 export async function saveResume(file: File): Promise<{ id: string; fileName: string; fileSize: number }> {

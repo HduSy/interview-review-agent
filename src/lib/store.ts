@@ -274,8 +274,23 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   },
 
   updateProfile: async (patch) => {
-    const next = await saveProfile(patch);
+    // Optimistic: compute next from current store snapshot and `set`
+    // synchronously so the next render/handler sees the merged state.
+    // Persistence is a fire-and-forget put with the FULL state — no
+    // read-modify-write inside Dexie, so concurrent calls can't race.
+    const current = get().profile;
+    const next: Profile = {
+      ...current,
+      ...patch,
+      id: "me",
+      updatedAt: Date.now(),
+    };
     set({ profile: next });
+    try {
+      await saveProfile(next);
+    } catch (err) {
+      console.error("[saveProfile]", err);
+    }
   },
 
   updateApiConfig: async (patch) => {
@@ -297,12 +312,23 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       ...(current.byProvider ?? {}),
       [current.provider]: sliceNext,
     };
-    const next = await saveApiConfig({ ...patch, byProvider });
+    const next: ApiConfig = {
+      ...current,
+      ...patch,
+      byProvider,
+      id: "default",
+      updatedAt: Date.now(),
+    };
     const keyChanged = "apiKey" in patch;
     set({
       apiConfig: next,
       ...(keyChanged ? { availableModels: [], modelsError: null } : {}),
     });
+    try {
+      await saveApiConfig(next);
+    } catch (err) {
+      console.error("[saveApiConfig]", err);
+    }
     if (keyChanged && next.apiKey.trim()) void get().fetchModels();
   },
 
@@ -331,14 +357,22 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       modelOverride: undefined,
     };
 
-    const next = await saveApiConfig({
+    const next: ApiConfig = {
+      ...current,
       provider,
       apiKey: nextFields.apiKey,
       baseURL: nextFields.baseURL,
       modelOverride: nextFields.modelOverride,
       byProvider,
-    });
+      id: "default",
+      updatedAt: Date.now(),
+    };
     set({ apiConfig: next, availableModels: [], modelsError: null });
+    try {
+      await saveApiConfig(next);
+    } catch (err) {
+      console.error("[saveApiConfig]", err);
+    }
     if (next.apiKey.trim()) void get().fetchModels();
   },
 
@@ -383,23 +417,21 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     const meta = await saveResume(file);
     const prev = get().profile.resumeBlobId;
     if (prev) await deleteResume(prev);
-    const next = await saveProfile({
+    await get().updateProfile({
       resumeBlobId: meta.id,
       resumeFileName: meta.fileName,
       resumeFileSize: meta.fileSize,
     });
-    set({ profile: next });
   },
 
   removeResume: async () => {
     const prev = get().profile.resumeBlobId;
     if (prev) await deleteResume(prev);
-    const next = await saveProfile({
+    await get().updateProfile({
       resumeBlobId: undefined,
       resumeFileName: undefined,
       resumeFileSize: undefined,
     });
-    set({ profile: next });
   },
 
   toggleSidebar: () => set((s) => ({ sidebarExpanded: !s.sidebarExpanded })),

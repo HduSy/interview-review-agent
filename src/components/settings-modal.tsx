@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { useAppStore } from "@/lib/store";
 import type { Provider } from "@/lib/db";
 import { PROVIDER_DEFAULT_URL } from "@/lib/db";
+import { ImeInput } from "./ime-input";
 
 const TABS: { id: "profile" | "api" | "usage"; label: string }[] = [
   { id: "profile", label: "画像" },
@@ -145,19 +146,19 @@ function ProfileTab() {
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <Field label="目标岗位 *" hint="必填">
-          <input
+          <ImeInput
             className={inputCls}
             value={profile.targetRole}
             placeholder="高级前端工程师"
-            onChange={(e) => update({ targetRole: e.target.value })}
+            onChange={(v) => update({ targetRole: v })}
           />
         </Field>
         <Field label="工作年限">
-          <input
+          <ImeInput
             className={inputCls}
             value={profile.yearsExp}
             placeholder="3 年"
-            onChange={(e) => update({ yearsExp: e.target.value })}
+            onChange={(v) => update({ yearsExp: v })}
           />
         </Field>
       </div>
@@ -178,21 +179,37 @@ function ProfileTab() {
               </button>
             </span>
           ))}
-          <input
+          <ImeInput
             className="flex-1 min-w-[100px] bg-transparent outline-none text-[13px] text-ink placeholder:text-muted-soft px-1"
             placeholder={profile.techStack.length ? "继续添加…" : "React, TypeScript…"}
             value={newTech}
-            onChange={(e) => setNewTech(e.target.value)}
+            onChange={(v) => setNewTech(v)}
+            onBlur={() => {
+              // Commit any draft on blur — IME Enter may have been
+              // swallowed by composition confirmation, leaving the chip
+              // unadded. Don't lose the user's typing on modal close.
+              const v = newTech.trim().replace(/,$/, "");
+              if (!v) return;
+              const latest = useAppStore.getState().profile.techStack;
+              if (!latest.includes(v)) {
+                update({ techStack: [...latest, v] });
+              }
+              setNewTech("");
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === ",") {
                 e.preventDefault();
                 const v = newTech.trim().replace(/,$/, "");
-                if (v && !profile.techStack.includes(v)) {
-                  update({ techStack: [...profile.techStack, v] });
+                // Read latest from store — the closure-captured `profile`
+                // may be stale if an earlier update hasn't yet re-rendered.
+                const latest = useAppStore.getState().profile.techStack;
+                if (v && !latest.includes(v)) {
+                  update({ techStack: [...latest, v] });
                 }
                 setNewTech("");
-              } else if (e.key === "Backspace" && !newTech && profile.techStack.length) {
-                update({ techStack: profile.techStack.slice(0, -1) });
+              } else if (e.key === "Backspace" && !newTech) {
+                const latest = useAppStore.getState().profile.techStack;
+                if (latest.length) update({ techStack: latest.slice(0, -1) });
               }
             }}
           />
@@ -217,25 +234,32 @@ function ProfileTab() {
               </button>
             </span>
           ))}
-          <input
+          <ImeInput
             className="flex-1 min-w-[100px] bg-transparent outline-none text-[13px] text-ink placeholder:text-muted-soft px-1"
             placeholder={profile.targetCompanies.length ? "继续添加…" : "Google, 字节…"}
             value={newCompany}
-            onChange={(e) => setNewCompany(e.target.value)}
+            onChange={(v) => setNewCompany(v)}
+            onBlur={() => {
+              const v = newCompany.trim().replace(/,$/, "");
+              if (!v) return;
+              const latest = useAppStore.getState().profile.targetCompanies;
+              if (!latest.includes(v)) {
+                update({ targetCompanies: [...latest, v] });
+              }
+              setNewCompany("");
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === ",") {
                 e.preventDefault();
                 const v = newCompany.trim().replace(/,$/, "");
-                if (v && !profile.targetCompanies.includes(v)) {
-                  update({ targetCompanies: [...profile.targetCompanies, v] });
+                const latest = useAppStore.getState().profile.targetCompanies;
+                if (v && !latest.includes(v)) {
+                  update({ targetCompanies: [...latest, v] });
                 }
                 setNewCompany("");
-              } else if (
-                e.key === "Backspace" &&
-                !newCompany &&
-                profile.targetCompanies.length
-              ) {
-                update({ targetCompanies: profile.targetCompanies.slice(0, -1) });
+              } else if (e.key === "Backspace" && !newCompany) {
+                const latest = useAppStore.getState().profile.targetCompanies;
+                if (latest.length) update({ targetCompanies: latest.slice(0, -1) });
               }
             }}
           />
@@ -323,11 +347,11 @@ function ApiTab() {
         label="Base URL"
         hint="向哪个 HTTPS 端点发请求。切换供应商会自动填默认值，可改成代理 / 自托管。"
       >
-        <input
+        <ImeInput
           className={`${inputCls} font-mono`}
           value={apiConfig.baseURL ?? ""}
           placeholder={placeholder}
-          onChange={(e) => update({ baseURL: e.target.value })}
+          onChange={(v) => update({ baseURL: v })}
         />
       </Field>
 
@@ -357,14 +381,14 @@ function ApiTab() {
       <Field label="API Key *" hint="存在浏览器 IndexedDB，仅你能看到">
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <input
+            <ImeInput
               type={showKey ? "text" : "password"}
               autoComplete="off"
               spellCheck={false}
               className={`${inputCls} font-mono w-full pr-10`}
               value={apiConfig.apiKey}
               placeholder="sk-..."
-              onChange={(e) => update({ apiKey: e.target.value })}
+              onChange={(v) => update({ apiKey: v })}
               onBlur={() => {
                 if (apiConfig.apiKey.trim()) fetchModels();
               }}
@@ -408,11 +432,11 @@ function ApiTab() {
       </Field>
 
       <Field label="模型 ID 覆盖" hint="留空则使用聊天框中选择的模型">
-        <input
+        <ImeInput
           className={`${inputCls} font-mono`}
           value={apiConfig.modelOverride ?? ""}
           placeholder="claude-sonnet-4-6 / gpt-4o / gemini-2.5-pro"
-          onChange={(e) => update({ modelOverride: e.target.value })}
+          onChange={(v) => update({ modelOverride: v })}
         />
       </Field>
 
