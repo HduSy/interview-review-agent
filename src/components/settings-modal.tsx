@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Settings as SettingsIcon, Upload, X } from "lucide-react";
+import { Check, Eye, EyeOff, Settings as SettingsIcon, Upload, X } from "lucide-react";
 import clsx from "clsx";
 import { useAppStore } from "@/lib/store";
 import type { Provider } from "@/lib/db";
@@ -312,6 +312,7 @@ function ApiTab() {
   const availableModels = useAppStore((s) => s.availableModels);
   const modelsLoading = useAppStore((s) => s.modelsLoading);
   const modelsError = useAppStore((s) => s.modelsError);
+  const [showKey, setShowKey] = useState(false);
 
   const placeholder =
     PROVIDER_DEFAULT_URL[apiConfig.provider] || "https://api.example.com/v1";
@@ -355,18 +356,33 @@ function ApiTab() {
 
       <Field label="API Key *" hint="存在浏览器 IndexedDB，仅你能看到">
         <div className="flex gap-2">
-          <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            className={`${inputCls} font-mono flex-1`}
-            value={apiConfig.apiKey}
-            placeholder="sk-..."
-            onChange={(e) => update({ apiKey: e.target.value })}
-            onBlur={() => {
-              if (apiConfig.apiKey.trim()) fetchModels();
-            }}
-          />
+          <div className="relative flex-1">
+            <input
+              type={showKey ? "text" : "password"}
+              autoComplete="off"
+              spellCheck={false}
+              className={`${inputCls} font-mono w-full pr-10`}
+              value={apiConfig.apiKey}
+              placeholder="sk-..."
+              onChange={(e) => update({ apiKey: e.target.value })}
+              onBlur={() => {
+                if (apiConfig.apiKey.trim()) fetchModels();
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((v) => !v)}
+              aria-label={showKey ? "隐藏" : "显示"}
+              title={showKey ? "隐藏" : "显示"}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted hover:text-ink hover:bg-surface-card"
+            >
+              {showKey ? (
+                <EyeOff size={14} strokeWidth={1.8} />
+              ) : (
+                <Eye size={14} strokeWidth={1.8} />
+              )}
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => fetchModels()}

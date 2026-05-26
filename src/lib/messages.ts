@@ -51,6 +51,12 @@ export type Message = {
   content: string;
   mode: ModeId;
   pending?: boolean;
+  /** Stream failed. Renders inline with a retry affordance; excluded from
+   *  persisted sessions and from outgoing API history. */
+  error?: boolean;
+  /** User aborted mid-stream. Kept in history (partial response is real
+   *  content from the model), but rendered with a subtle "stopped" hint. */
+  aborted?: boolean;
   payload?: MessagePayload;
   createdAt: number;
 };

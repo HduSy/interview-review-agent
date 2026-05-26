@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, FileText, Paperclip, Sparkles, X } from "lucide-react";
+import { ArrowRight, FileText, Paperclip, Sparkles, Square, X } from "lucide-react";
 import clsx from "clsx";
 import { COMMANDS, type CommandDef } from "@/lib/commands";
 import { useAppStore } from "@/lib/store";
@@ -25,6 +25,8 @@ export function Composer({
 }) {
   const activateChatMode = useAppStore((s) => s.activateChatMode);
   const sendUserMessage = useAppStore((s) => s.sendUserMessage);
+  const stopStreaming = useAppStore((s) => s.stopStreaming);
+  const streaming = useAppStore((s) => s.streamingPendingId !== null);
   const profile = useAppStore((s) => s.profile);
   const openSettings = useAppStore((s) => s.openSettings);
   const availableModels = useAppStore((s) => s.availableModels);
@@ -154,6 +156,7 @@ export function Composer({
     }
     if (e.key === "Enter" && !e.shiftKey && !composing) {
       e.preventDefault();
+      if (streaming) return; // streaming guard — user must hit Stop first
       handleSubmit();
     }
   }
@@ -258,19 +261,31 @@ export function Composer({
             </button>
             <div className="flex-1" />
             <ModelPicker />
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className={clsx(
-                "w-8 h-8 rounded-md flex items-center justify-center text-white transition-colors",
-                canSubmit
-                  ? "bg-primary hover:bg-primary-active"
-                  : "bg-primary/40 cursor-not-allowed",
-              )}
-            >
-              <ArrowRight size={15} strokeWidth={2} />
-            </button>
+            {streaming ? (
+              <button
+                type="button"
+                onClick={stopStreaming}
+                title="停止生成"
+                aria-label="停止生成"
+                className="w-8 h-8 rounded-md flex items-center justify-center bg-ink text-white hover:opacity-90 transition-opacity"
+              >
+                <Square size={12} strokeWidth={2} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={clsx(
+                  "w-8 h-8 rounded-md flex items-center justify-center text-white transition-colors",
+                  canSubmit
+                    ? "bg-primary hover:bg-primary-active"
+                    : "bg-primary/40 cursor-not-allowed",
+                )}
+              >
+                <ArrowRight size={15} strokeWidth={2} />
+              </button>
+            )}
           </div>
         </div>
       </div>

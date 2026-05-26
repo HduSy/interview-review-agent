@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "highlight.js/styles/github.css";
 
 @theme {
   --color-primary: #cc785c;
@@ -90,4 +91,168 @@ kbd {
   border: 1px solid var(--color-hairline);
   border-radius: 4px;
   color: var(--color-body);
+}
+
+/* ---------- Markdown rendering scope ---------- */
+.md {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--color-body-strong);
+  word-wrap: break-word;
+}
+.md > * + * {
+  margin-top: 0.85em;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  font-weight: 600;
+  color: var(--color-ink);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.md h1 {
+  font-size: 1.5em;
+  margin-top: 1.2em;
+}
+.md h2 {
+  font-size: 1.25em;
+  margin-top: 1.1em;
+}
+.md h3 {
+  font-size: 1.1em;
+  margin-top: 1em;
+}
+.md h4 {
+  font-size: 1em;
+  margin-top: 0.9em;
+}
+.md p {
+  margin: 0;
+}
+.md ul,
+.md ol {
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li + li {
+  margin-top: 0.25em;
+}
+.md li > p {
+  margin: 0;
+}
+.md a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.md a:hover {
+  color: var(--color-primary-active);
+}
+.md strong {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.md em {
+  font-style: italic;
+}
+.md blockquote {
+  border-left: 3px solid var(--color-hairline);
+  padding: 0.1em 0 0.1em 0.9em;
+  color: var(--color-body);
+  font-style: normal;
+  margin: 0.4em 0;
+}
+.md hr {
+  border: none;
+  border-top: 1px solid var(--color-hairline);
+  margin: 1em 0;
+}
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--color-surface-card);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--color-ink);
+}
+.md pre {
+  background: var(--color-surface-dark);
+  color: var(--color-on-dark);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.md pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+/* highlight.js github theme assumes light background — override for our dark pre */
+.md pre .hljs {
+  background: transparent;
+  color: var(--color-on-dark);
+  padding: 0;
+}
+.md pre .hljs-keyword,
+.md pre .hljs-built_in,
+.md pre .hljs-tag {
+  color: #ff9d6a;
+}
+.md pre .hljs-string,
+.md pre .hljs-attr {
+  color: #a3d977;
+}
+.md pre .hljs-number,
+.md pre .hljs-literal {
+  color: #ffd479;
+}
+.md pre .hljs-comment {
+  color: #8a8780;
+  font-style: italic;
+}
+.md pre .hljs-function,
+.md pre .hljs-title {
+  color: #82c4ff;
+}
+.md table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 0.4em 0;
+}
+.md th,
+.md td {
+  border: 1px solid var(--color-hairline);
+  padding: 6px 10px;
+  text-align: left;
+}
+.md th {
+  background: var(--color-surface-soft);
+  font-weight: 600;
+}
+/* Streaming cursor blink at the tail of an in-flight message */
+.md-cursor::after {
+  content: "▍";
+  display: inline-block;
+  margin-left: 1px;
+  color: var(--color-primary);
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
 }

@@ -60,6 +60,8 @@ type State = {
   modelPickerOpen: boolean;
   modelPickerSubOpen: boolean;
   messages: Message[];
+  /** The pending assistant message id currently being streamed, or null. */
+  streamingPendingId: string | null;
   sessions: Session[];
   currentSessionId: string | null;
   profile: Profile;
@@ -81,7 +83,9 @@ export type GithubUser = {
 };
 
 type Actions = {
-  // Slash command — switches the current chat's mode without navigating away.
+  // Slash command — switches the current chat's mode. Triggers an implicit
+  // newChat when the mode actually changes (mixing intro / system prompts
+  // across modes was confusing).
   activateChatMode: (id: ModeId | "settings") => void;
   // Sidebar — navigates between chat view and per-mode history lists.
   selectSidebarMode: (id: ModeId) => void;
@@ -111,6 +115,8 @@ type Actions = {
   closeModelPicker: () => void;
 
   sendUserMessage: (content: string) => void;
+  stopStreaming: () => void;
+  retryMessage: (assistantMessageId: string) => void;
   appendIntroIfEmpty: (mode: ModeId) => void;
   loadSession: (id: string) => Promise<void>;
   deleteCurrentSession: () => Promise<void>;
@@ -122,6 +128,18 @@ type Actions = {
   pushToast: (text: string, kind?: ToastKind, durationMs?: number) => string;
   dismissToast: (id: string) => void;
 };
+
+// Non-reactive: AbortController for the in-flight stream lives outside the
+// store so writing to it doesn't trigger re-renders. The store only tracks
+// `streamingPendingId` for UI affordances.
+let activeAbortController: AbortController | null = null;
+
+function abortActiveStream(): void {
+  if (activeAbortController) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+}
 
 const PLACEHOLDER_AI_DELAY_MS = 600;
 
@@ -174,6 +192,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   modelPickerOpen: false,
   modelPickerSubOpen: false,
   messages: [],
+  streamingPendingId: null,
   sessions: [],
   currentSessionId: null,
   profile: DEFAULT_PROFILE,
@@ -192,15 +211,25 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       set({ settingsOpen: true, settingsTab: "profile" });
       return;
     }
-    set({ chatMode: id, view: { kind: "chat" } });
-    if (id !== "chat") get().appendIntroIfEmpty(id);
-    // Sync the session's mode only if it has already been persisted
-    // (i.e. a stream completed for this session). Otherwise wait — the
-    // initial write comes from streamReply on completion.
-    const { currentSessionId, sessions } = get();
-    if (currentSessionId && sessions.some((s) => s.id === currentSessionId)) {
-      void persistCurrentSession();
+    const { chatMode } = get();
+    // Mode actually changed → fresh chat. Carrying over text history into
+    // a new mode confuses the model (different system prompt, structured
+    // output schema mismatch) and produces unhelpful answers.
+    if (chatMode !== id) {
+      abortActiveStream();
+      set({
+        chatMode: id,
+        view: { kind: "chat" },
+        messages: [],
+        currentSessionId: null,
+        streamingPendingId: null,
+      });
+      if (id !== "chat") get().appendIntroIfEmpty(id);
+      return;
     }
+    // Same mode — keep history; just snap back to chat view.
+    set({ view: { kind: "chat" } });
+    if (id !== "chat") get().appendIntroIfEmpty(id);
   },
 
   selectSidebarMode: (id) => {
@@ -211,13 +240,16 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     }
   },
 
-  newChat: () =>
+  newChat: () => {
+    abortActiveStream();
     set({
       view: { kind: "chat" },
       chatMode: "chat",
       messages: [],
       currentSessionId: null,
-    }),
+      streamingPendingId: null,
+    });
+  },
 
   openSettings: (tab) => set({ settingsOpen: true, settingsTab: tab ?? "profile" }),
   closeSettings: () => set({ settingsOpen: false }),
@@ -420,6 +452,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   loadSession: async (id) => {
+    abortActiveStream();
     const cached = get().sessions.find((s) => s.id === id);
     const session = cached ?? (await loadSessionById(id));
     if (!session) return;
@@ -428,17 +461,20 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       chatMode: session.mode,
       messages: session.messages,
       currentSessionId: session.id,
+      streamingPendingId: null,
     });
   },
 
   deleteCurrentSession: async () => {
     const id = get().currentSessionId;
     if (!id) return;
+    abortActiveStream();
     await deleteSession(id);
     set((s) => ({
       sessions: s.sessions.filter((x) => x.id !== id),
       messages: [],
       currentSessionId: null,
+      streamingPendingId: null,
       view: { kind: "chat" },
       chatMode: "chat",
     }));
@@ -504,6 +540,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     // intentionally discarded and never lands in DB.
 
     if (apiConfig.apiKey.trim()) {
+      set({ streamingPendingId: pendingId });
       void streamReply({
         sessionId,
         pendingId,
@@ -534,6 +571,28 @@ export const useAppStore = create<State & Actions>((set, get) => ({
         void persistCurrentSession();
       }
     }, PLACEHOLDER_AI_DELAY_MS);
+  },
+
+  stopStreaming: () => {
+    abortActiveStream();
+    // The streamReply finally block will flip streamingPendingId; nothing
+    // more to do here.
+  },
+
+  retryMessage: (assistantMessageId) => {
+    // Walk back from the failed/aborted assistant message to find the user
+    // message that triggered it, drop the assistant stub, and resubmit.
+    const { messages } = get();
+    const idx = messages.findIndex((m) => m.id === assistantMessageId);
+    if (idx === -1) return;
+    let userIdx = idx - 1;
+    while (userIdx >= 0 && messages[userIdx].role !== "user") userIdx--;
+    if (userIdx < 0) return;
+    const userText = messages[userIdx].content;
+    // Truncate history at the user message (exclusive) so the resubmitted
+    // user message isn't duplicated.
+    set({ messages: messages.slice(0, userIdx) });
+    get().sendUserMessage(userText);
   },
 }));
 
@@ -593,10 +652,22 @@ async function streamReply({
 
   const apiMessages = normalizeForApi(priorMessages);
   if (apiMessages.length === 0) {
-    applyAssistant({ content: "⚠️ 还没有可发送的用户消息" });
-    persist();
+    applyAssistant({ content: "还没有可发送的用户消息", error: true });
+    set((s) => ({
+      streamingPendingId: s.streamingPendingId === pendingId ? null : s.streamingPendingId,
+    }));
     return;
   }
+
+  // Each in-flight call owns its AbortController. stopStreaming() and
+  // newChat() both abort it; the cleanup below clears the module-level
+  // reference only if it still points at this call (avoids a later call
+  // clobbering an earlier one).
+  const controller = new AbortController();
+  activeAbortController = controller;
+  let aborted = false;
+  let acc = "";
+  let lastDisplayText = "";
 
   try {
     const res = await fetch("/api/chat", {
@@ -610,33 +681,61 @@ async function streamReply({
         system,
         messages: apiMessages,
       }),
+      signal: controller.signal,
     });
 
     if (!res.ok || !res.body) {
       const errText = await res.text().catch(() => "请求失败");
-      applyAssistant({ content: `⚠️ ${errText}` });
-      persist();
+      applyAssistant({ content: errText, error: true });
       return;
     }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     const spec = OUTPUT_SPECS[mode];
-    let acc = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      acc += decoder.decode(value, { stream: true });
-      const { displayText } = stripUsageTrailer(acc);
-      const partial = spec?.parsePartial(displayText) ?? null;
-      if (partial) {
-        applyAssistant({ content: partial.summary, payload: partial.payload });
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        const { displayText } = stripUsageTrailer(acc);
+        lastDisplayText = displayText;
+        const partial = spec?.parsePartial(displayText) ?? null;
+        if (partial) {
+          applyAssistant({ content: partial.summary, payload: partial.payload });
+        } else {
+          applyAssistant({ content: displayText, payload: undefined });
+        }
+      }
+    } catch (err) {
+      // AbortError surfaces here when the user clicks stop. Treat the
+      // partial content already streamed as a real (truncated) reply.
+      if ((err as Error).name === "AbortError") {
+        aborted = true;
       } else {
-        applyAssistant({ content: displayText, payload: undefined });
+        throw err;
       }
     }
     acc += decoder.decode();
     const { displayText: finalText, trailer } = stripUsageTrailer(acc);
+
+    if (aborted) {
+      // Keep whatever streamed so far; mark aborted for UI hint.
+      set((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === pendingId
+            ? {
+                ...m,
+                content: lastDisplayText || finalText,
+                pending: false,
+                aborted: true,
+              }
+            : m,
+        ),
+      }));
+      persist();
+      return;
+    }
 
     // Final pass: strict parse confirms all required fields landed.
     const finalParsed = spec?.parse(finalText) ?? null;
@@ -658,6 +757,10 @@ async function streamReply({
     }
     persist();
 
+    // After the first successful exchange persists, ask the model for a
+    // short title — much better than truncating the user's first line.
+    void maybeGenerateTitle({ sessionId, mode, apiConfig, modelId });
+
     // Record token usage emitted by the server's `finish` event.
     if (trailer) {
       try {
@@ -677,9 +780,101 @@ async function streamReply({
       }
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    applyAssistant({ content: `⚠️ 调用失败：${msg}` });
-    persist();
+    if ((err as Error).name === "AbortError") {
+      // Network-level abort (before stream started) — drop the pending
+      // bubble entirely; the user explicitly cancelled.
+      set((s) => ({
+        messages: s.messages.filter((m) => m.id !== pendingId),
+      }));
+    } else {
+      const msg = err instanceof Error ? err.message : String(err);
+      applyAssistant({ content: `调用失败：${msg}`, error: true });
+    }
+  } finally {
+    if (activeAbortController === controller) activeAbortController = null;
+    set((s) => ({
+      streamingPendingId: s.streamingPendingId === pendingId ? null : s.streamingPendingId,
+    }));
+  }
+}
+
+/**
+ * Fire-and-forget call after a successful first exchange. Asks the same
+ * provider for a 6-12 character session title. If anything goes wrong we
+ * silently keep the heuristic fallback already written by writeSession.
+ */
+async function maybeGenerateTitle(args: {
+  sessionId: string;
+  mode: ModeId;
+  apiConfig: ApiConfig;
+  modelId: string;
+}): Promise<void> {
+  const state = useAppStore.getState();
+  const session = state.sessions.find((s) => s.id === args.sessionId);
+  if (!session) return;
+  // Only generate once — after the first successful turn the title is the
+  // heuristic truncation of user text. Skip if it's been customized.
+  const firstUser = session.messages.find((m) => m.role === "user");
+  const firstAssistant = session.messages.find(
+    (m) => m.role === "assistant" && !m.error,
+  );
+  if (!firstUser || !firstAssistant) return;
+  const fallback = (() => {
+    const s = firstUser.content.trim();
+    return s.length > 40 ? s.slice(0, 38) + "…" : s;
+  })();
+  if (session.title !== fallback) return; // already customized/generated
+
+  const model = resolveModel(
+    args.apiConfig.provider,
+    args.modelId,
+    args.apiConfig.modelOverride,
+  );
+  const sample = (firstUser.content + "\n\n" + firstAssistant.content).slice(
+    0,
+    1200,
+  );
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        provider: args.apiConfig.provider,
+        apiKey: args.apiConfig.apiKey,
+        baseURL: args.apiConfig.baseURL,
+        model,
+        system:
+          "你是会话命名助手。读取一段用户提问和 AI 回答，输出一个 6-14 个汉字（或等长英文）的标题，概括话题核心。直接输出标题文本，不要引号、不要解释、不要标点结尾。",
+        messages: [{ role: "user", content: sample }],
+      }),
+    });
+    if (!res.ok || !res.body) return;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let raw = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    const { displayText } = stripUsageTrailer(raw);
+    const title = displayText
+      .replace(/^["'`「『]+|["'`」』。．!？!?\s]+$/g, "")
+      .trim()
+      .slice(0, 28);
+    if (!title || title.length < 2) return;
+    // Re-read latest messages; another turn may have already streamed.
+    const latest = useAppStore.getState();
+    if (latest.currentSessionId !== args.sessionId) return;
+    await writeSession({
+      sessionId: args.sessionId,
+      mode: args.mode,
+      messages: latest.messages,
+      titleOverride: title,
+    });
+  } catch {
+    // Title is best-effort — never surface to the user.
   }
 }
 
@@ -687,18 +882,23 @@ async function writeSession(input: {
   sessionId: string;
   mode: ModeId;
   messages: Message[];
+  titleOverride?: string;
 }): Promise<void> {
   // `pending: true` placeholders are UI-only loading bubbles — never persist.
-  const clean = input.messages.filter((m) => !m.pending);
+  // Error stubs (`⚠️ ...`) shouldn't pollute future API context either.
+  const clean = input.messages.filter((m) => !m.pending && !m.error);
   const firstUser = clean.find(
     (m) => m.role === "user" && m.content.trim(),
   );
   if (!firstUser) return;
   const titleSource = firstUser.content.trim();
-  const title =
+  const fallbackTitle =
     titleSource.length > 40 ? titleSource.slice(0, 38) + "…" : titleSource;
   const state = useAppStore.getState();
   const existing = state.sessions.find((s) => s.id === input.sessionId);
+  // Title precedence: explicit override > existing > heuristic fallback.
+  // This way later persists never clobber a generated/edited title.
+  const title = input.titleOverride ?? existing?.title ?? fallbackTitle;
   const now = Date.now();
   const session: Session = {
     id: input.sessionId,
@@ -793,7 +993,9 @@ function fullText(m: Message): string {
 function normalizeForApi(
   msgs: Message[],
 ): Array<{ role: "user" | "assistant"; content: string }> {
-  const live = msgs.filter((m) => !m.pending && fullText(m).trim());
+  const live = msgs.filter(
+    (m) => !m.pending && !m.error && fullText(m).trim(),
+  );
   let i = 0;
   while (i < live.length && live[i].role !== "user") i++;
   const trimmed = live.slice(i);
