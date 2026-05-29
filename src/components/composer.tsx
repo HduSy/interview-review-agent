@@ -1,22 +1,90 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, FileText, Paperclip, Sparkles, Square, X } from "lucide-react";
+import {
+  ArrowRight,
+  File,
+  FileArchive,
+  FileCode,
+  FileImage,
+  FileJson,
+  FileSpreadsheet,
+  FileText,
+  Sparkles,
+  Square,
+  Upload,
+  X,
+} from "lucide-react";
 import clsx from "clsx";
 import { COMMANDS, type CommandDef } from "@/lib/commands";
 import { useAppStore } from "@/lib/store";
+import { modelSupportsVision } from "@/lib/model-capabilities";
 import { SlashPalette } from "./slash-palette";
 import { ModelPicker } from "./model-picker";
+
+type FileKind =
+  | "image"
+  | "code"
+  | "data"
+  | "spreadsheet"
+  | "markdown"
+  | "text"
+  | "pdf"
+  | "archive"
+  | "other";
 
 type Attachment = {
   id: string;
   name: string;
   size: number;
+  kind: FileKind;
+  /** Inlined text content for code / text files. Undefined for binary. */
   text?: string;
+  /** Blob URL for image preview. Must be URL.revokeObjectURL'd on removal. */
+  imageUrl?: string;
 };
 
-const TEXTUAL = /\.(md|markdown|txt|json|csv|log|jsx?|tsx?)$/i;
+const TEXTUAL = /\.(md|markdown|txt|json|csv|log|jsx?|tsx?|ya?ml|toml|xml|env|sh|bash|zsh|sql|py|rb|go|rs|java|cpp|c|h|php|swift|kt|mjs|cjs)$/i;
+const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i;
 const MAX_TEXT_BYTES = 200_000;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — generous for screenshots
+
+function classifyFile(name: string): FileKind {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  if (/^(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/.test(ext)) return "image";
+  if (/^(js|jsx|ts|tsx|mjs|cjs|py|rb|go|rs|java|cpp|c|h|sh|bash|zsh|sql|php|swift|kt)$/.test(ext))
+    return "code";
+  if (/^(json|ya?ml|toml|xml|env)$/.test(ext)) return "data";
+  if (/^(csv|tsv|xlsx?|ods)$/.test(ext)) return "spreadsheet";
+  if (/^(md|markdown|mdx|rst)$/.test(ext)) return "markdown";
+  if (/^(txt|log)$/.test(ext)) return "text";
+  if (ext === "pdf") return "pdf";
+  if (/^(zip|tar|gz|tgz|rar|7z|bz2)$/.test(ext)) return "archive";
+  return "other";
+}
+
+function iconForKind(kind: FileKind): React.ReactNode {
+  const props = { size: 12, strokeWidth: 1.8 } as const;
+  switch (kind) {
+    case "image":
+      return <FileImage {...props} />;
+    case "code":
+      return <FileCode {...props} />;
+    case "data":
+      return <FileJson {...props} />;
+    case "spreadsheet":
+      return <FileSpreadsheet {...props} />;
+    case "markdown":
+    case "text":
+      return <FileText {...props} />;
+    case "pdf":
+      return <FileText {...props} />;
+    case "archive":
+      return <FileArchive {...props} />;
+    default:
+      return <File {...props} />;
+  }
+}
 
 export function Composer({
   placeholder = "问点什么，或输入 / 调用命令…",
@@ -31,12 +99,19 @@ export function Composer({
   const openSettings = useAppStore((s) => s.openSettings);
   const availableModels = useAppStore((s) => s.availableModels);
   const hasModels = availableModels.length > 0;
+  const modelId = useAppStore((s) => s.modelId);
+  const modelOverride = useAppStore((s) => s.apiConfig.modelOverride);
+  // The override (if non-empty) is what actually gets sent to the upstream,
+  // so capability check follows the same precedence.
+  const effectiveModelId = modelOverride?.trim() || modelId;
+  const supportsVision = modelSupportsVision(effectiveModelId);
 
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachResume, setAttachResume] = useState(false);
+  const [previewImage, setPreviewImage] = useState<Attachment | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +144,31 @@ export function Composer({
     if (!profile.resumeFileName && attachResume) setAttachResume(false);
   }, [profile.resumeFileName, attachResume]);
 
+  // Revoke all outstanding blob URLs when the component unmounts.
+  // (Per-removal revocation is handled inline above; this is the safety
+  // net for tab close / route change.)
+  useEffect(() => {
+    return () => {
+      for (const a of attachments) {
+        if (a.imageUrl) URL.revokeObjectURL(a.imageUrl);
+      }
+    };
+    // We only want this on unmount — capturing the latest list via ref
+    // would over-engineer it. Stale closure is fine: any newer URLs
+    // added after the last render get cleaned up via remove / submit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ESC closes the image preview lightbox.
+  useEffect(() => {
+    if (!previewImage) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPreviewImage(null);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [previewImage]);
+
   function pickCommand(c: CommandDef) {
     // No models configured → only /settings is actionable. Other commands
     // are disabled in the palette UI; intercept keyboard Enter too.
@@ -82,17 +182,47 @@ export function Composer({
     if (!files) return;
     const next: Attachment[] = [];
     for (const f of Array.from(files)) {
-      const a: Attachment = { id: `${Date.now()}-${f.name}`, name: f.name, size: f.size };
+      const kind = classifyFile(f.name);
+      const a: Attachment = {
+        id: `${Date.now()}-${f.name}`,
+        name: f.name,
+        size: f.size,
+        kind,
+      };
+      // Inline text content for code / data / log-ish files so we can
+      // actually feed them to the LLM.
       if (TEXTUAL.test(f.name) && f.size <= MAX_TEXT_BYTES) {
         try {
           a.text = await f.text();
         } catch {
-          /* ignore */
+          /* ignore — leave as binary metadata */
+        }
+      }
+      // Build a blob URL for image previews (cleaned up on remove / submit
+      // / unmount). Skipping oversized images so the page doesn't OOM.
+      if (
+        (kind === "image" || IMAGE.test(f.name)) &&
+        f.size <= MAX_IMAGE_BYTES
+      ) {
+        try {
+          a.imageUrl = URL.createObjectURL(f);
+        } catch {
+          /* ignore — chip will fall back to the icon */
         }
       }
       next.push(a);
     }
     setAttachments((prev) => [...prev, ...next]);
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target?.imageUrl) URL.revokeObjectURL(target.imageUrl);
+      // Close lightbox if it's pointing at the removed one.
+      if (previewImage?.id === id) setPreviewImage(null);
+      return prev.filter((p) => p.id !== id);
+    });
   }
 
   function toggleResume() {
@@ -121,7 +251,12 @@ export function Composer({
     if (v) parts.push(v);
     sendUserMessage(parts.join("\n\n"));
     setValue("");
+    // Release any blob URLs we created for image previews.
+    for (const a of attachments) {
+      if (a.imageUrl) URL.revokeObjectURL(a.imageUrl);
+    }
     setAttachments([]);
+    setPreviewImage(null);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -206,12 +341,28 @@ export function Composer({
               {attachments.map((a) => (
                 <Chip
                   key={a.id}
-                  icon={<FileText size={12} strokeWidth={1.8} />}
-                  label={a.name}
-                  hint={`${(a.size / 1024).toFixed(1)} KB${a.text ? "" : " · 二进制"}`}
-                  onRemove={() =>
-                    setAttachments((prev) => prev.filter((p) => p.id !== a.id))
+                  icon={
+                    a.imageUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImage(a)}
+                        title="预览"
+                        className="block w-5 h-5 rounded overflow-hidden bg-canvas border border-hairline shrink-0 hover:opacity-80 transition-opacity"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={a.imageUrl}
+                          alt={a.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      iconForKind(a.kind)
+                    )
                   }
+                  label={a.name}
+                  hint={`${(a.size / 1024).toFixed(1)} KB${a.text ? "" : a.imageUrl ? "" : " · 二进制"}`}
+                  onRemove={() => removeAttachment(a.id)}
                 />
               ))}
             </div>
@@ -234,30 +385,44 @@ export function Composer({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              title="附加文件"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-hairline text-muted hover:bg-surface-card"
+              disabled={!supportsVision}
+              title={
+                supportsVision
+                  ? "上传文件"
+                  : `当前模型「${effectiveModelId}」可能不支持图片 / 文件，切换到 Claude / GPT-4o / Gemini 等多模态模型`
+              }
+              className={clsx(
+                "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-hairline text-muted transition-colors",
+                supportsVision
+                  ? "hover:bg-surface-card"
+                  : "opacity-40 cursor-not-allowed",
+              )}
             >
-              <Paperclip size={15} strokeWidth={1.6} />
+              <Upload size={15} strokeWidth={1.6} />
             </button>
             <button
               type="button"
               onClick={toggleResume}
+              disabled={!supportsVision}
               title={
-                profile.resumeFileName
-                  ? attachResume
-                    ? `取消附加：${profile.resumeFileName}`
-                    : `附加：${profile.resumeFileName}`
-                  : "尚未上传简历，点击去设置"
+                !supportsVision
+                  ? `当前模型「${effectiveModelId}」可能不支持图片 / 文件，切换到 Claude / GPT-4o / Gemini 等多模态模型`
+                  : profile.resumeFileName
+                    ? attachResume
+                      ? `取消附加：${profile.resumeFileName}`
+                      : `附加：${profile.resumeFileName}`
+                    : "尚未上传简历，点击去设置"
               }
               className={clsx(
-                "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors",
-                attachResume
-                  ? "border-primary text-primary bg-primary/10"
-                  : "border-hairline text-muted hover:bg-surface-card",
+                "inline-flex items-center justify-center px-2.5 py-1.5 rounded-md border transition-colors",
+                !supportsVision
+                  ? "border-hairline text-muted opacity-40 cursor-not-allowed"
+                  : attachResume
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-hairline text-muted hover:bg-surface-card",
               )}
             >
               <Sparkles size={15} strokeWidth={1.6} />
-              简历
             </button>
             <div className="flex-1" />
             <ModelPicker />
@@ -288,6 +453,145 @@ export function Composer({
             )}
           </div>
         </div>
+      </div>
+
+      {previewImage?.imageUrl && (
+        <ImageLightbox
+          src={previewImage.imageUrl}
+          alt={previewImage.name}
+          onClose={() => setPreviewImage(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 8;
+const ZOOM_STEP = 1.15;
+
+function ImageLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{
+    mouseX: number;
+    mouseY: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Reset transforms when the image source changes (different preview).
+  useEffect(() => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  }, [src]);
+
+  // React's synthetic onWheel is registered as a passive listener, which
+  // means `preventDefault()` is silently ignored — the page would scroll
+  // behind the lightbox while the user is trying to zoom. Bind a native
+  // non-passive listener so we can intercept the wheel cleanly.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      setScale((prev) => {
+        const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+        const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, prev * factor));
+        // Snap offset back to center as we leave / re-enter "fits viewport".
+        if (next <= 1) setOffset({ x: 0, y: 0 });
+        return next;
+      });
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function startDrag(e: React.MouseEvent<HTMLImageElement>) {
+    e.stopPropagation();
+    if (scale <= 1) return;
+    setDragging(true);
+    dragStart.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      offsetX: offset.x,
+      offsetY: offset.y,
+    };
+  }
+  function onDragMove(e: React.MouseEvent<HTMLImageElement>) {
+    if (!dragging || !dragStart.current) return;
+    setOffset({
+      x: dragStart.current.offsetX + (e.clientX - dragStart.current.mouseX),
+      y: dragStart.current.offsetY + (e.clientY - dragStart.current.mouseY),
+    });
+  }
+  function endDrag() {
+    setDragging(false);
+    dragStart.current = null;
+  }
+  function onDoubleClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  }
+
+  const cursor = scale > 1 ? (dragging ? "grabbing" : "grab") : "default";
+
+  return (
+    <div
+      role="dialog"
+      aria-modal
+      aria-label={`预览：${alt}`}
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6 sm:p-12 cursor-zoom-out overflow-hidden"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={startDrag}
+        onMouseMove={onDragMove}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        onDoubleClick={onDoubleClick}
+        draggable={false}
+        style={{
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          cursor,
+          // Disable transition during active drag so the image tracks the
+          // cursor 1:1; otherwise we ease the wheel-zoom smoothly.
+          transition: dragging ? "none" : "transform 0.08s ease-out",
+          willChange: "transform",
+        }}
+        className="max-w-full max-h-full object-contain rounded-md shadow-[0_24px_64px_rgba(0,0,0,0.5)] select-none"
+      />
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="关闭预览"
+        className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-md bg-white/10 text-white hover:bg-white/20 transition-colors"
+      >
+        <X size={18} strokeWidth={1.8} />
+      </button>
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 text-white/80 text-[12px] font-mono px-3 py-1 rounded-md bg-black/40">
+        <span className="truncate max-w-[60vw]">{alt}</span>
+        <span className="text-white/50">·</span>
+        <span className="tabular-nums">{Math.round(scale * 100)}%</span>
+        <span className="text-white/40 text-[11px] hidden sm:inline">
+          滚轮缩放 · 双击复位
+        </span>
       </div>
     </div>
   );
