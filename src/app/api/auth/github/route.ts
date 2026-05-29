@@ -14,7 +14,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const origin = new URL(req.url).origin;
+  // Behind a reverse proxy `req.url` reflects the proxy's internal address
+  // (e.g. http://localhost:3000), which leaks into the redirect_uri and
+  // makes GitHub reject the callback. Production must set APP_ORIGIN
+  // (e.g. https://findfunplus.cn); local dev falls back to req.url which
+  // is correct when hitting Next directly.
+  const origin = process.env.APP_ORIGIN ?? new URL(req.url).origin;
   const state = crypto.randomUUID();
   const params = new URLSearchParams({
     client_id: clientId,
@@ -29,9 +34,9 @@ export async function GET(req: NextRequest) {
   res.cookies.set(STATE_COOKIE, state, {
     httpOnly: true,
     sameSite: "lax",
-    // Honor the actual request protocol — `secure: true` on an HTTP site
-    // makes browsers silently drop the cookie.
-    secure: req.nextUrl.protocol === "https:",
+    // Match the public scheme — `secure: true` on plain HTTP makes browsers
+    // silently drop the cookie (and then state validation fails downstream).
+    secure: origin.startsWith("https:"),
     maxAge: STATE_MAX_AGE,
     path: "/",
   });

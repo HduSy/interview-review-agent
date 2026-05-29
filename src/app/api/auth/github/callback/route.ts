@@ -14,13 +14,18 @@ type GithubUserResponse = {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
+  // Production must set APP_ORIGIN (e.g. https://findfunplus.cn) so the
+  // redirect_uri matches GitHub's registered callback exactly. Without it
+  // we'd echo back the proxy's internal http://localhost:3000 and GitHub
+  // would reject the code exchange. See sibling github/route.ts.
+  const origin = process.env.APP_ORIGIN ?? url.origin;
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const cookieState = req.cookies.get(STATE_COOKIE)?.value;
 
   // Fail safely back to home — UI just stays in "未登录" state.
   function bounce(reason?: string) {
-    const res = NextResponse.redirect(url.origin + (reason ? `/?auth_error=${reason}` : "/"));
+    const res = NextResponse.redirect(origin + (reason ? `/?auth_error=${reason}` : "/"));
     res.cookies.delete(STATE_COOKIE);
     return res;
   }
@@ -48,7 +53,10 @@ export async function GET(req: NextRequest) {
         client_id: clientId,
         client_secret: clientSecret,
         code,
-        redirect_uri: `${url.origin}/api/auth/github/callback`,
+        // Must match byte-for-byte the redirect_uri sent in the authorize
+        // step — APP_ORIGIN being read identically in both routes ensures
+        // that.
+        redirect_uri: `${origin}/api/auth/github/callback`,
       }),
     });
     if (!tokenRes.ok) return bounce("token_http");
@@ -84,14 +92,14 @@ export async function GET(req: NextRequest) {
     avatarUrl: user.avatar_url,
   });
 
-  const res = NextResponse.redirect(url.origin + "/");
+  const res = NextResponse.redirect(origin + "/");
   res.cookies.set(USER_COOKIE, payload, {
     httpOnly: true,
     sameSite: "lax",
-    // Honor the actual request protocol — `secure: true` on an HTTP site
-    // makes browsers silently drop the cookie. The payload is public
-    // GitHub profile data, not credentials.
-    secure: url.protocol === "https:",
+    // Match the public scheme — `secure: true` on an HTTP site makes
+    // browsers silently drop the cookie. The payload is public GitHub
+    // profile data, not credentials.
+    secure: origin.startsWith("https:"),
     maxAge: USER_MAX_AGE,
     path: "/",
   });
