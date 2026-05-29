@@ -28,7 +28,7 @@ export function Welcome() {
               从这里开始准备。
             </h1>
             <div className="flex items-center gap-2.5 mb-7">
-              <SpikeMark size={20} color="var(--color-primary)" />
+              <SpikeMark size={20} color="var(--color-ink)" />
               <span className="font-medium text-xs tracking-[0.06em] uppercase text-primary">
                 OC · Review
               </span>
