@@ -6,19 +6,22 @@ import clsx from "clsx";
 import { useAppStore } from "@/lib/store";
 import type { Provider } from "@/lib/db";
 import { PROVIDER_DEFAULT_URL } from "@/lib/db";
+import { useT } from "@/lib/i18n/use-t";
+import { LOCALES, type Locale } from "@/lib/i18n/locale";
 import { ImeInput } from "./ime-input";
-
-const TABS: { id: "profile" | "api" | "usage"; label: string }[] = [
-  { id: "profile", label: "画像" },
-  { id: "api", label: "模型 & API" },
-  { id: "usage", label: "用量" },
-];
 
 export function SettingsModal() {
   const open = useAppStore((s) => s.settingsOpen);
   const tab = useAppStore((s) => s.settingsTab);
   const setTab = useAppStore((s) => s.setSettingsTab);
   const close = useAppStore((s) => s.closeSettings);
+  const t = useT();
+
+  const TABS: { id: "profile" | "api" | "usage"; label: string }[] = [
+    { id: "profile", label: t.settings.tabs.profile },
+    { id: "api", label: t.settings.tabs.api },
+    { id: "usage", label: t.settings.tabs.usage },
+  ];
 
   useEffect(() => {
     if (!open) return;
@@ -46,9 +49,10 @@ export function SettingsModal() {
         <div className="px-7 pt-5 flex items-center gap-3">
           <SettingsIcon size={16} strokeWidth={1.8} className="text-muted" />
           <span className="text-[12px] font-medium uppercase tracking-[0.06em] text-muted">
-            /settings
+            {t.settings.slash}
           </span>
           <div className="flex-1" />
+          <LanguageToggle />
           <button onClick={close} className="text-muted hover:text-ink">
             <X size={16} strokeWidth={1.8} />
           </button>
@@ -58,10 +62,10 @@ export function SettingsModal() {
             className="text-[28px] font-medium tracking-[-0.02em] text-ink m-0 mb-1.5"
             style={{ fontFamily: "var(--font-serif)" }}
           >
-            告诉 OC 你是谁。
+            {t.settings.title}
           </h2>
           <p className="text-sm text-muted leading-[1.55]">
-            这些信息只存在你的浏览器里（IndexedDB），不会上传到我们的服务器。
+            {t.settings.subtitle}
           </p>
         </div>
 
@@ -91,17 +95,46 @@ export function SettingsModal() {
         <div className="px-7 py-4 border-t border-hairline bg-surface-soft flex items-center gap-3">
           <span className="text-xs text-muted inline-flex items-center gap-1.5">
             <Check size={12} strokeWidth={2} className="text-success" />
-            自动保存到本地
+            {t.settings.autoSave}
           </span>
           <div className="flex-1" />
           <button
             onClick={close}
             className="bg-canvas text-ink border border-hairline text-sm font-medium px-4 py-2 rounded-md hover:bg-surface-card"
           >
-            完成
+            {t.settings.done}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function LanguageToggle() {
+  const locale = useAppStore((s) => s.locale);
+  const setLocale = useAppStore((s) => s.setLocale);
+  const t = useT();
+  const labels: Record<Locale, string> = { zh: t.language.zh, en: t.language.en };
+  return (
+    <div
+      role="group"
+      aria-label={t.language.label}
+      className="inline-flex items-center gap-0.5 p-0.5 rounded-md bg-surface-card border border-hairline"
+    >
+      {LOCALES.map((l) => (
+        <button
+          key={l}
+          onClick={() => setLocale(l)}
+          className={clsx(
+            "px-2 py-0.5 rounded text-[12px] font-medium transition-colors",
+            locale === l
+              ? "bg-canvas text-ink shadow-[0_1px_2px_rgba(20,20,19,0.08)]"
+              : "text-muted hover:text-ink",
+          )}
+        >
+          {labels[l]}
+        </button>
+      ))}
     </div>
   );
 }
@@ -134,6 +167,8 @@ function ProfileTab() {
   const update = useAppStore((s) => s.updateProfile);
   const uploadResume = useAppStore((s) => s.uploadResume);
   const removeResume = useAppStore((s) => s.removeResume);
+  const t = useT();
+  const tp = t.settings.profile;
   const fileRef = useRef<HTMLInputElement>(null);
   const [newTech, setNewTech] = useState("");
   const [newCompany, setNewCompany] = useState("");
@@ -145,25 +180,25 @@ function ProfileTab() {
   return (
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <Field label="目标岗位 *" hint="必填">
+        <Field label={tp.targetRole} hint={tp.targetRoleHint}>
           <ImeInput
             className={inputCls}
             value={profile.targetRole}
-            placeholder="高级前端工程师"
+            placeholder={tp.targetRolePh}
             onChange={(v) => update({ targetRole: v })}
           />
         </Field>
-        <Field label="工作年限">
+        <Field label={tp.yearsExp}>
           <ImeInput
             className={inputCls}
             value={profile.yearsExp}
-            placeholder="3 年"
+            placeholder={tp.yearsExpPh}
             onChange={(v) => update({ yearsExp: v })}
           />
         </Field>
       </div>
 
-      <Field label="技术栈" hint="OC 会用来出题，回车添加">
+      <Field label={tp.techStack} hint={tp.techHint}>
         <div className="min-h-10 bg-canvas border border-hairline rounded-md px-2 py-1.5 flex flex-wrap gap-1.5 items-center">
           {profile.techStack.map((s) => (
             <span
@@ -181,7 +216,7 @@ function ProfileTab() {
           ))}
           <ImeInput
             className="flex-1 min-w-[100px] bg-transparent outline-none text-[13px] text-ink placeholder:text-muted-soft px-1"
-            placeholder={profile.techStack.length ? "继续添加…" : "React, TypeScript…"}
+            placeholder={profile.techStack.length ? tp.techPh2 : tp.techPh1}
             value={newTech}
             onChange={(v) => setNewTech(v)}
             onBlur={() => {
@@ -216,7 +251,7 @@ function ProfileTab() {
         </div>
       </Field>
 
-      <Field label="目标公司" hint="回车添加">
+      <Field label={tp.companies} hint={tp.companiesHint}>
         <div className="min-h-10 bg-canvas border border-hairline rounded-md px-2 py-1.5 flex flex-wrap gap-1.5 items-center">
           {profile.targetCompanies.map((c) => (
             <span
@@ -236,7 +271,7 @@ function ProfileTab() {
           ))}
           <ImeInput
             className="flex-1 min-w-[100px] bg-transparent outline-none text-[13px] text-ink placeholder:text-muted-soft px-1"
-            placeholder={profile.targetCompanies.length ? "继续添加…" : "Google, 字节…"}
+            placeholder={profile.targetCompanies.length ? tp.companiesPh2 : tp.companiesPh1}
             value={newCompany}
             onChange={(v) => setNewCompany(v)}
             onBlur={() => {
@@ -266,7 +301,7 @@ function ProfileTab() {
         </div>
       </Field>
 
-      <Field label="简历" hint="PDF · OC 会解析关键信息并记住">
+      <Field label={tp.resume} hint={tp.resumeHint}>
         <input
           ref={fileRef}
           type="file"
@@ -288,7 +323,7 @@ function ProfileTab() {
                 {profile.resumeFileName}
               </div>
               <div className="text-xs text-muted">
-                {((profile.resumeFileSize ?? 0) / 1024).toFixed(1)} KB · 已保存到本地
+                {tp.resumeSaved(((profile.resumeFileSize ?? 0) / 1024).toFixed(1))}
               </div>
             </div>
             <button
@@ -296,12 +331,12 @@ function ProfileTab() {
               className="bg-canvas text-ink border border-hairline text-[13px] font-medium px-3 py-1.5 rounded-md hover:bg-surface-card inline-flex items-center gap-1.5"
             >
               <Upload size={13} strokeWidth={1.8} />
-              替换
+              {tp.resumeReplace}
             </button>
             <button
               onClick={() => removeResume()}
               className="text-muted hover:text-ink p-1.5"
-              aria-label="删除简历"
+              aria-label={tp.resumeDelete}
             >
               <X size={14} strokeWidth={1.8} />
             </button>
@@ -312,7 +347,7 @@ function ProfileTab() {
             className="w-full px-4 py-6 bg-canvas border border-dashed border-hairline rounded-xl text-muted hover:border-primary/40 hover:text-ink inline-flex items-center justify-center gap-2 text-[13px]"
           >
             <Upload size={14} strokeWidth={1.8} />
-            点击上传 PDF 简历
+            {tp.resumeUpload}
           </button>
         )}
       </Field>
@@ -320,12 +355,12 @@ function ProfileTab() {
   );
 }
 
-const PROVIDERS: { id: Provider; label: string; hint: string }[] = [
-  { id: "anthropic", label: "Anthropic", hint: "Claude 4.x · 推荐" },
-  { id: "openai", label: "OpenAI", hint: "GPT-4 / o-series" },
-  { id: "google", label: "Google", hint: "Gemini 系列" },
-  { id: "zhipu", label: "智谱", hint: "GLM 系列 · 国内直连" },
-  { id: "custom", label: "Custom", hint: "OpenAI/Anthropic 兼容端点" },
+const PROVIDERS: { id: Exclude<Provider, "azure-openai">; label: string }[] = [
+  { id: "anthropic", label: "Anthropic" },
+  { id: "openai", label: "OpenAI" },
+  { id: "google", label: "Google" },
+  { id: "zhipu", label: "智谱" },
+  { id: "custom", label: "Custom" },
 ];
 
 function ApiTab() {
@@ -336,6 +371,8 @@ function ApiTab() {
   const availableModels = useAppStore((s) => s.availableModels);
   const modelsLoading = useAppStore((s) => s.modelsLoading);
   const modelsError = useAppStore((s) => s.modelsError);
+  const t = useT();
+  const ta = t.settings.api;
   const [showKey, setShowKey] = useState(false);
 
   const placeholder =
@@ -343,10 +380,7 @@ function ApiTab() {
 
   return (
     <div>
-      <Field
-        label="Base URL"
-        hint="向哪个 HTTPS 端点发请求。切换供应商会自动填默认值，可改成代理 / 自托管。"
-      >
+      <Field label={ta.baseUrl} hint={ta.baseUrlHint}>
         <ImeInput
           className={`${inputCls} font-mono`}
           value={apiConfig.baseURL ?? ""}
@@ -355,7 +389,7 @@ function ApiTab() {
         />
       </Field>
 
-      <Field label="模型供应商" hint="本地保存，不会上传">
+      <Field label={ta.provider} hint={ta.providerHint}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {PROVIDERS.map((p) => {
             const active = apiConfig.provider === p.id;
@@ -371,14 +405,14 @@ function ApiTab() {
                 )}
               >
                 <span className="text-[13px] font-medium text-ink">{p.label}</span>
-                <span className="text-[12px] text-muted">{p.hint}</span>
+                <span className="text-[12px] text-muted">{ta.providerHints[p.id]}</span>
               </button>
             );
           })}
         </div>
       </Field>
 
-      <Field label="API Key *" hint="存在浏览器 IndexedDB，仅你能看到">
+      <Field label={ta.apiKey} hint={ta.apiKeyHint}>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <ImeInput
@@ -396,8 +430,8 @@ function ApiTab() {
             <button
               type="button"
               onClick={() => setShowKey((v) => !v)}
-              aria-label={showKey ? "隐藏" : "显示"}
-              title={showKey ? "隐藏" : "显示"}
+              aria-label={showKey ? ta.hide : ta.show}
+              title={showKey ? ta.hide : ta.show}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted hover:text-ink hover:bg-surface-card"
             >
               {showKey ? (
@@ -413,7 +447,7 @@ function ApiTab() {
             disabled={!apiConfig.apiKey.trim() || modelsLoading}
             className="px-3.5 h-10 rounded-md border border-hairline bg-canvas text-[13px] font-medium text-ink hover:bg-surface-card disabled:text-muted-soft disabled:cursor-not-allowed whitespace-nowrap"
           >
-            {modelsLoading ? "拉取中…" : "拉取模型列表"}
+            {modelsLoading ? ta.fetching : ta.fetchModels}
           </button>
         </div>
         <div className="mt-2 text-[12px] leading-[1.55]">
@@ -421,27 +455,25 @@ function ApiTab() {
             <span className="text-error">⚠️ {modelsError}</span>
           ) : availableModels.length > 0 ? (
             <span className="text-success">
-              ✓ 已加载 {availableModels.length} 个可用模型 — 在聊天框右下角选用
+              {ta.modelsLoaded(availableModels.length)}
             </span>
           ) : (
-            <span className="text-muted-soft">
-              配置 API Key 后查看可用模型
-            </span>
+            <span className="text-muted-soft">{ta.configKeyHint}</span>
           )}
         </div>
       </Field>
 
-      <Field label="模型 ID 覆盖" hint="留空则使用聊天框中选择的模型">
+      <Field label={ta.modelOverride} hint={ta.modelOverrideHint}>
         <ImeInput
           className={`${inputCls} font-mono`}
           value={apiConfig.modelOverride ?? ""}
-          placeholder="claude-sonnet-4-6 / gpt-4o / gemini-2.5-pro"
+          placeholder={ta.modelOverridePh}
           onChange={(v) => update({ modelOverride: v })}
         />
       </Field>
 
       <div className="mt-6 px-4 py-3 bg-surface-soft border border-hairline-soft rounded-md text-[12px] text-muted leading-[1.55]">
-        每次发消息都把上面这些字段一起 POST 到 <code className="font-mono">/api/chat</code>，服务端拿到后即时构造 SDK 客户端调用上游，apiKey 不会落盘。
+        {ta.footerNote}
       </div>
     </div>
   );
@@ -450,6 +482,8 @@ function ApiTab() {
 function UsageTab() {
   const stats = useAppStore((s) => s.usageStats);
   const refresh = useAppStore((s) => s.refreshUsage);
+  const t = useT();
+  const tu = t.settings.usage;
 
   useEffect(() => {
     void refresh();
@@ -463,10 +497,10 @@ function UsageTab() {
       : null;
 
   const cards: { label: string; value: string }[] = [
-    { label: "今日 Tokens", value: fmt(stats?.todayTokens) },
-    { label: "本月 Tokens", value: fmt(stats?.monthTokens) },
-    { label: "累计调用", value: fmt(stats?.totalCalls) },
-    { label: "平均每次", value: avg !== null ? avg.toLocaleString() : "—" },
+    { label: tu.todayTokens, value: fmt(stats?.todayTokens) },
+    { label: tu.monthTokens, value: fmt(stats?.monthTokens) },
+    { label: tu.totalCalls, value: fmt(stats?.totalCalls) },
+    { label: tu.avgPerCall, value: avg !== null ? avg.toLocaleString() : "—" },
   ];
 
   return (
@@ -491,14 +525,14 @@ function UsageTab() {
       {stats && stats.recentRows.length > 0 ? (
         <div>
           <div className="text-[11px] font-medium tracking-[0.12em] uppercase text-muted-soft px-1 pb-2">
-            最近调用
+            {tu.recentCalls}
           </div>
           <div className="bg-canvas border border-hairline rounded-md overflow-hidden">
             <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-3 py-2 text-[11px] font-medium tracking-[0.06em] uppercase text-muted-soft border-b border-hairline-soft">
-              <span>Model</span>
-              <span className="text-right">In</span>
-              <span className="text-right">Out</span>
-              <span className="text-right">When</span>
+              <span>{tu.colModel}</span>
+              <span className="text-right">{tu.colIn}</span>
+              <span className="text-right">{tu.colOut}</span>
+              <span className="text-right">{tu.colWhen}</span>
             </div>
             {stats.recentRows.map((r) => (
               <div
@@ -509,7 +543,7 @@ function UsageTab() {
                 <span className="text-right">{r.promptTokens}</span>
                 <span className="text-right">{r.completionTokens}</span>
                 <span className="text-right text-muted">
-                  {new Date(r.ts).toLocaleTimeString("zh-CN", {
+                  {new Date(r.ts).toLocaleTimeString(undefined, {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
@@ -520,7 +554,7 @@ function UsageTab() {
         </div>
       ) : (
         <div className="px-4 py-3 bg-surface-soft border border-hairline-soft rounded-md text-[12px] text-muted leading-[1.55]">
-          还没有调用记录。每次成功流式回复后会在这里累加 input / output token。所有数据仅保存在本地 IndexedDB。
+          {tu.empty}
         </div>
       )}
     </div>

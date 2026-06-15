@@ -11,22 +11,24 @@ import {
 
 export type ModeId = "chat" | "mock" | "review" | "practice" | "predict" | "optimize";
 
+// `title` / `desc` live in the i18n dictionary keyed by `id`
+// (MESSAGES[locale].commands[id]); read them via useT() at render time.
+// `chat` is never a slash command (it's the default mode), so the id is the
+// non-chat modes plus settings — this also lets `t.commands[id]` index cleanly.
 export type CommandDef = {
-  id: ModeId | "settings";
+  id: Exclude<ModeId, "chat"> | "settings";
   cmd: string;
-  title: string;
-  desc: string;
   hot: string;
   icon: LucideIcon;
 };
 
 export const COMMANDS: CommandDef[] = [
-  { id: "mock", cmd: "mock", title: "模拟面试", desc: "AI 扮演面试官，按岗位 + 公司风格出题", hot: "M", icon: UserRound },
-  { id: "review", cmd: "review", title: "复盘面试", desc: "粘贴一段面试记录，AI 给出结构化反馈", hot: "R", icon: ClipboardList },
-  { id: "practice", cmd: "practice", title: "随堂练习", desc: "随机出一题，立刻作答，即时反馈", hot: "P", icon: Layers },
-  { id: "predict", cmd: "predict", title: "题目预测", desc: "基于 JD + 简历生成可能被问到的问题", hot: "F", icon: Sparkles },
-  { id: "optimize", cmd: "optimize", title: "答案优化", desc: "把你的草稿改写得更符合 STAR", hot: "O", icon: Wand2 },
-  { id: "settings", cmd: "settings", title: "完善画像", desc: "目标岗位、技术栈、简历…配置一次受用一直", hot: ",", icon: SettingsIcon },
+  { id: "mock", cmd: "mock", hot: "M", icon: UserRound },
+  { id: "review", cmd: "review", hot: "R", icon: ClipboardList },
+  { id: "practice", cmd: "practice", hot: "P", icon: Layers },
+  { id: "predict", cmd: "predict", hot: "F", icon: Sparkles },
+  { id: "optimize", cmd: "optimize", hot: "O", icon: Wand2 },
+  { id: "settings", cmd: "settings", hot: ",", icon: SettingsIcon },
 ];
 
 export const RAIL_MODES: { id: ModeId; cmd: string; icon: LucideIcon }[] = [

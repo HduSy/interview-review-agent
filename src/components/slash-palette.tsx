@@ -3,6 +3,7 @@
 import { ArrowRight, Sparkles } from "lucide-react";
 import clsx from "clsx";
 import type { CommandDef } from "@/lib/commands";
+import { useT } from "@/lib/i18n/use-t";
 
 export function SlashPalette({
   commands,
@@ -17,6 +18,7 @@ export function SlashPalette({
   onHover: (index: number) => void;
   hasModels: boolean;
 }) {
+  const t = useT();
   return (
     <div
       role="listbox"
@@ -26,21 +28,22 @@ export function SlashPalette({
       <div className="px-2.5 pt-1.5 pb-2 flex items-center gap-2 border-b border-hairline-soft">
         <Sparkles size={13} strokeWidth={1.8} className="text-primary" />
         <span className="text-[12px] font-medium tracking-[0.06em] uppercase text-muted">
-          Slash commands
+          {t.slashPalette.title}
         </span>
         <div className="flex-1" />
         <span className="font-mono text-[11px] text-muted-soft">
-          ↑↓ 选择 · ⏎ 确认 · esc 关闭
+          {t.slashPalette.navHint}
         </span>
       </div>
       <div className="flex flex-col py-1.5">
         {commands.length === 0 ? (
-          <div className="px-3 py-3 text-[13px] text-muted">未匹配到命令</div>
+          <div className="px-3 py-3 text-[13px] text-muted">{t.slashPalette.noMatch}</div>
         ) : (
           commands.map((c, i) => {
             const Icon = c.icon;
             const active = i === selectedIndex;
             const disabled = !hasModels && c.id !== "settings";
+            const cmd = t.commands[c.id];
             return (
               <button
                 key={c.cmd}
@@ -72,16 +75,16 @@ export function SlashPalette({
                 >
                   /{c.cmd}
                 </span>
-                <span className="text-[13px] text-muted flex-1">{c.desc}</span>
+                <span className="text-[13px] text-muted flex-1">{cmd.desc}</span>
                 {disabled ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted bg-surface-card px-2 py-0.5 rounded-full">
-                    需先 /settings
+                    {t.slashPalette.needSettings}
                   </span>
                 ) : (
                   active && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                       <ArrowRight size={10} strokeWidth={2} />
-                      激活 /{c.cmd}
+                      {t.slashPalette.activate(c.cmd)}
                     </span>
                   )
                 )}
@@ -92,7 +95,7 @@ export function SlashPalette({
         )}
       </div>
       <div className="px-3 pt-2 pb-1 border-t border-hairline-soft text-[11px] text-muted-soft">
-        选中后：聊天框切换为对应 Mode · 当前对话归入该 Mode · 左侧 Tab 同步高亮
+        {t.slashPalette.footer}
       </div>
     </div>
   );

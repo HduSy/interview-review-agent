@@ -7,17 +7,19 @@ import type { Session } from "@/lib/db";
 import { formatRelativeDate } from "@/lib/date";
 import { buildHistoryMeta } from "@/lib/history-meta";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
 import { HistoryShell } from "./history-shell";
 
 export function HistoryView({ mode }: { mode: Exclude<ModeId, "chat"> }) {
-  const [filter, setFilter] = useState<string>("全部");
+  const t = useT();
+  const [filter, setFilter] = useState<string>(t.history.all);
   const [search, setSearch] = useState("");
   const sessions = useAppStore((s) => s.sessions);
 
   useEffect(() => {
-    setFilter("全部");
+    setFilter(t.history.all);
     setSearch("");
-  }, [mode]);
+  }, [mode, t.history.all]);
 
   const realForMode = useMemo(
     () => sessions.filter((s) => s.mode === mode),
@@ -25,8 +27,8 @@ export function HistoryView({ mode }: { mode: Exclude<ModeId, "chat"> }) {
   );
 
   const meta = useMemo(
-    () => buildHistoryMeta(mode, realForMode.length),
-    [mode, realForMode.length],
+    () => buildHistoryMeta(mode, realForMode.length, t),
+    [mode, realForMode.length, t],
   );
 
   const q = search.trim().toLowerCase();
@@ -47,14 +49,18 @@ export function HistoryView({ mode }: { mode: Exclude<ModeId, "chat"> }) {
       search={search}
       onSearchChange={setSearch}
     >
-      <SessionList items={filtered} empty={emptyMsg(filtered.length, q)} />
+      <SessionList items={filtered} empty={emptyMsg(filtered.length, q, t)} />
     </HistoryShell>
   );
 }
 
-function emptyMsg(count: number, q: string): string | null {
+function emptyMsg(
+  count: number,
+  q: string,
+  t: ReturnType<typeof useT>,
+): string | null {
   if (count > 0) return null;
-  return q ? `没有匹配「${q}」的记录` : "还没有记录";
+  return q ? t.history.matchEmpty(q) : t.history.noRecords;
 }
 
 function EmptyState({ msg }: { msg: string }) {
@@ -69,6 +75,7 @@ function SessionList({
   empty: string | null;
 }) {
   const load = useAppStore((s) => s.loadSession);
+  const t = useT();
   if (empty) return <EmptyState msg={empty} />;
   return (
     <div>
@@ -101,7 +108,7 @@ function SessionList({
               ) : null}
             </div>
             <div className="font-mono text-[11px] text-muted min-w-[60px] text-right">
-              {turns} 条
+              {t.history.recordsUnit(turns)}
             </div>
             <div className="text-[13px] text-muted min-w-[110px] text-right">
               {formatRelativeDate(s.updatedAt)}

@@ -9,6 +9,7 @@ import {
   type ModelOption,
 } from "@/lib/models";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
 
 const FALLBACK_MODELS: ModelOption[] = [
   DEFAULT_MODEL,
@@ -30,6 +31,7 @@ export function ModelPicker() {
   const toggleOpen = useAppStore((s) => s.toggleModelPicker);
   const setSubOpen = useAppStore((s) => s.setModelPickerSubOpen);
   const close = useAppStore((s) => s.closeModelPicker);
+  const t = useT();
 
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -78,7 +80,7 @@ export function ModelPicker() {
           open && "bg-surface-card",
         )}
       >
-        {hasModels ? selected.name : "无可用模型"}
+        {hasModels ? selected.name : t.modelPicker.noModels}
         <ChevronDown
           size={14}
           strokeWidth={1.8}
@@ -127,10 +129,10 @@ export function ModelPicker() {
           >
             <div className="flex-1 min-w-0">
               <div className="text-[14px] font-medium text-ink leading-tight">
-                Adaptive thinking
+                {t.modelPicker.adaptiveThinking}
               </div>
               <div className="text-[12px] text-muted mt-0.5">
-                Thinks for more complex tasks
+                {t.modelPicker.adaptiveDesc}
               </div>
             </div>
             <span
@@ -165,7 +167,7 @@ export function ModelPicker() {
             )}
           >
             <div className="flex-1 text-[14px] font-medium text-ink">
-              More models
+              {t.modelPicker.moreModels}
               {remoteModels.length > 0 && (
                 <span className="ml-2 font-mono text-[11px] text-muted-soft">
                   {rest.length}
@@ -173,7 +175,7 @@ export function ModelPicker() {
               )}
             </div>
             {modelsLoading && (
-              <span className="text-[11px] text-muted">加载中…</span>
+              <span className="text-[11px] text-muted">{t.modelPicker.loading}</span>
             )}
             <ChevronRight size={16} strokeWidth={1.8} className="text-muted shrink-0" />
           </button>
@@ -182,7 +184,7 @@ export function ModelPicker() {
             <div className="absolute left-[calc(100%+8px)] top-0 w-[260px] max-h-[420px] overflow-y-auto bg-canvas border border-hairline rounded-xl shadow-[0_12px_32px_rgba(20,20,19,0.10),0_2px_6px_rgba(20,20,19,0.04)] p-1.5">
               {rest.length === 0 ? (
                 <div className="px-3 py-4 text-[13px] text-muted-soft text-center">
-                  无更多模型
+                  {t.modelPicker.noMoreModels}
                 </div>
               ) : (
                 rest.map((m) => (

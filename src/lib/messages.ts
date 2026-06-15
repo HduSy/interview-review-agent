@@ -61,19 +61,6 @@ export type Message = {
   createdAt: number;
 };
 
-export const MODE_INTROS: Record<Exclude<ModeId, "chat">, string> = {
-  mock:
-    "Mock 模式已就绪。告诉我目标岗位与公司，我会按对应风格出题；如果你已经在 /settings 配过画像，直接说『开始』就行。",
-  review:
-    "把面试记录粘进来 — 越完整越好。我会从 STAR 结构、技术深度、表达清晰度三个维度给结构化反馈。",
-  practice:
-    "随时说『出题』或按回车，我会基于你的画像随机抽一道。作答后立即给反馈，不打断。",
-  predict:
-    "告诉我目标公司 / 岗位（或粘 JD），我会基于你的简历和画像生成 8–12 道可能被问到的题。",
-  optimize:
-    "把你写好的答案草稿贴进来。我会按 STAR 法则点出问题段落，给一个改写版本，告诉你为什么这样写更稳。",
-};
-
 export function makeId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();

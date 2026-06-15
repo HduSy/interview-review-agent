@@ -4,6 +4,7 @@ import { Search, X } from "lucide-react";
 import clsx from "clsx";
 import type { HistoryMeta, StatBadge } from "@/lib/history-meta";
 import type { ModeId } from "@/lib/commands";
+import { useT } from "@/lib/i18n/use-t";
 
 export function HistoryShell({
   mode,
@@ -22,12 +23,13 @@ export function HistoryShell({
   onSearchChange: (s: string) => void;
   children: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <main className="flex-1 flex flex-col overflow-hidden bg-canvas">
       <div className="px-8 sm:px-14 pt-10 pb-6 border-b border-hairline">
         <div className="mb-[18px]">
           <div className="text-[12px] text-muted tracking-[0.08em] uppercase mb-2">
-            /{mode} · 历史
+            /{mode} · {t.history.historySuffix}
           </div>
           <h1
             className="font-medium m-0 text-[32px] sm:text-[40px] leading-[1.1] tracking-[-0.02em] text-ink"
@@ -72,14 +74,14 @@ export function HistoryShell({
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="搜索历史…"
+            placeholder={t.history.searchPlaceholder}
             className="flex-1 min-w-0 bg-transparent outline-none text-[13px] text-ink placeholder:text-muted-soft"
           />
           {search && (
             <button
               onClick={() => onSearchChange("")}
               className="text-muted hover:text-ink shrink-0"
-              aria-label="清空搜索"
+              aria-label={t.history.clearSearch}
             >
               <X size={12} strokeWidth={2} />
             </button>

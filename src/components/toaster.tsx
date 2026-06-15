@@ -3,6 +3,7 @@
 import { CheckCircle2, Info, X, XCircle } from "lucide-react";
 import clsx from "clsx";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
 
 const TONE = {
   success: { icon: CheckCircle2, color: "text-success" },
@@ -13,6 +14,7 @@ const TONE = {
 export function Toaster() {
   const toasts = useAppStore((s) => s.toasts);
   const dismiss = useAppStore((s) => s.dismissToast);
+  const tr = useT();
   if (toasts.length === 0) return null;
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 w-[320px] pointer-events-none">
@@ -35,7 +37,7 @@ export function Toaster() {
             <button
               onClick={() => dismiss(t.id)}
               className="text-muted hover:text-ink shrink-0 -mr-0.5 -mt-0.5"
-              aria-label="关闭通知"
+              aria-label={tr.common.closeNotification}
             >
               <X size={14} strokeWidth={1.8} />
             </button>

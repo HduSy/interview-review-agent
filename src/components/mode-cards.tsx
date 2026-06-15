@@ -11,6 +11,8 @@ import type {
   ReviewFeedbackPayload,
 } from "@/lib/messages";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
+import type { Messages } from "@/lib/i18n/messages";
 import { copyText, downloadText, safeFilename } from "@/lib/export";
 
 /** Button with brief "✓ 已 X" feedback after click. */
@@ -74,6 +76,7 @@ const SCORE_STYLES: Record<
 function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
   const sendUserMessage = useAppStore((s) => s.sendUserMessage);
   const pushToast = useAppStore((s) => s.pushToast);
+  const t = useT();
   const hasSummary = data.summary.trim().length > 0;
   const hasScores = data.scores.length > 0;
   const hasStrengths = data.strengths.length > 0;
@@ -126,14 +129,14 @@ function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ColumnCard
           dotClass="bg-success"
-          label="做得好的"
+          label={t.modeCards.strengths}
           items={data.strengths}
           icon={<Check size={13} strokeWidth={2} className="text-success" />}
           pending={!hasStrengths}
         />
         <ColumnCard
           dotClass="bg-primary"
-          label="下次试试"
+          label={t.modeCards.improvements}
           items={data.improvements}
           icon={<ArrowRight size={13} strokeWidth={2} className="text-primary" />}
           pending={!hasImprovements}
@@ -143,7 +146,7 @@ function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
         <div className="flex items-center gap-2 mb-3">
           <Sparkles size={14} strokeWidth={1.8} className="text-accent-amber" />
           <span className="text-[12px] uppercase tracking-[0.06em] font-medium text-on-dark">
-            建议改写
+            {t.modeCards.suggestedRewrite}
           </span>
           <div className="flex-1" />
           {data.rewrite.tag && (
@@ -167,20 +170,18 @@ function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
         <div className="flex gap-2 flex-wrap">
           <ActionButton
             variant="primary"
-            label="继续改下一段"
-            onAct={() =>
-              sendUserMessage("继续改下一段，针对 Action 或 Result 部分给一版重写。")
-            }
+            label={t.modeCards.continueNext}
+            onAct={() => sendUserMessage(t.modeCards.continueNextSend)}
           />
           <ActionButton
-            label="导出复盘报告"
-            doneLabel="✓ 已下载"
-            onAct={() => downloadText("review-report.md", buildReviewMarkdown(data))}
+            label={t.modeCards.exportReview}
+            doneLabel={t.common.downloaded}
+            onAct={() => downloadText("review-report.md", buildReviewMarkdown(data, t))}
           />
           <ActionButton
-            label="把要点存入画像"
+            label={t.modeCards.saveToProfile}
             onAct={() => {
-              pushToast(`已记录到画像 · ${data.rewrite.tag}`, "success");
+              pushToast(t.modeCards.savedToProfile(data.rewrite.tag), "success");
             }}
           />
         </div>
@@ -189,31 +190,32 @@ function ReviewFeedbackCard({ data }: { data: ReviewFeedbackPayload }) {
   );
 }
 
-function buildReviewMarkdown(d: ReviewFeedbackPayload): string {
+function buildReviewMarkdown(d: ReviewFeedbackPayload, t: Messages): string {
+  const m = t.md;
   const scores = d.scores
     .map((s) => `- **${s.label}**：${s.grade} · ${s.tone}`)
     .join("\n");
   const strengths = d.strengths.map((s) => `- ${s}`).join("\n");
   const improvements = d.improvements.map((s) => `- ${s}`).join("\n");
-  return `# 复盘报告
+  return `# ${m.reviewTitle}
 
-## 整体评估
+## ${m.reviewOverall}
 
 ${d.summary}
 
-## 维度评分
+## ${m.reviewScores}
 
 ${scores}
 
-## 做得好的
+## ${m.reviewStrengths}
 
 ${strengths}
 
-## 下次试试
+## ${m.reviewImprovements}
 
 ${improvements}
 
-## 建议改写 · ${d.rewrite.tag}
+## ${m.reviewRewrite} · ${d.rewrite.tag}
 
 > ${d.rewrite.text}
 `;
@@ -259,6 +261,7 @@ function ColumnCard({
 // ─── Practice ────────────────────────────────────────────────────────
 
 function PracticeQuestionCard({ data }: { data: PracticeQuestionPayload }) {
+  const t = useT();
   const hasTitle = data.title.trim().length > 0;
   const hasBody = data.body.trim().length > 0;
   const hasAnyChip = !!(data.category || data.difficulty || data.estimated || data.track);
@@ -279,7 +282,7 @@ function PracticeQuestionCard({ data }: { data: PracticeQuestionPayload }) {
         {hasTitle ? (
           <span className="text-ink">{data.title}</span>
         ) : (
-          <span className="text-muted-soft">正在抽题…</span>
+          <span className="text-muted-soft">{t.modeCards.drawingQuestion}</span>
         )}
       </h2>
       {hasBody ? (
@@ -332,6 +335,7 @@ function Pill({
 function PredictSessionCard({ data }: { data: PredictSessionPayload }) {
   const activateChatMode = useAppStore((s) => s.activateChatMode);
   const sendUserMessage = useAppStore((s) => s.sendUserMessage);
+  const t = useT();
   const hasContext = data.context.trim().length > 0;
   const hasHottest = data.hottest.length > 0;
   const hasQuestions = data.questions.length > 0;
@@ -349,7 +353,7 @@ function PredictSessionCard({ data }: { data: PredictSessionPayload }) {
         )}
         {hasHottest && (
           <div className="flex gap-1.5 flex-wrap items-center mb-4">
-            <span className="text-[12px] text-muted mr-1">高概率题：</span>
+            <span className="text-[12px] text-muted mr-1">{t.modeCards.hottest}</span>
             {data.hottest.map((h) => (
               <Pill key={h} tone="cream">
                 {h}
@@ -359,7 +363,7 @@ function PredictSessionCard({ data }: { data: PredictSessionPayload }) {
         )}
         <div className="flex items-baseline justify-between mb-2">
           <span className="text-[12px] uppercase tracking-[0.06em] font-medium text-muted">
-            生成
+            {t.modeCards.generated}
           </span>
           <span
             className="text-[28px] font-medium tracking-[-0.02em] text-ink"
@@ -391,7 +395,7 @@ function PredictSessionCard({ data }: { data: PredictSessionPayload }) {
                 <div className="flex items-center gap-2 mt-1.5">
                   <Pill tone="outline">{q.category}</Pill>
                   <span className="font-mono text-[11px] text-muted">
-                    {(q.prob * 100).toFixed(0)}% 命中概率
+                    {(q.prob * 100).toFixed(0)}% {t.modeCards.hitProb}
                   </span>
                 </div>
               </div>
@@ -408,22 +412,20 @@ function PredictSessionCard({ data }: { data: PredictSessionPayload }) {
         <div className="flex gap-2 flex-wrap">
           <ActionButton
             variant="primary"
-            label="用作 /mock 题库"
+            label={t.modeCards.useAsMock}
             onAct={() => {
               activateChatMode("mock");
               const list = data.questions
                 .slice(0, 5)
                 .map((q, i) => `${i + 1}. ${q.q}`)
                 .join("\n");
-              sendUserMessage(
-                `以下面这套预测题为题库，按概率从高到低逐题模拟，每次一题：\n\n${list}`,
-              );
+              sendUserMessage(t.modeCards.mockSend(list));
             }}
           />
           <ActionButton
-            label="导出 Markdown"
-            doneLabel="✓ 已下载"
-            onAct={() => downloadText("predict-session.md", buildPredictMarkdown(data))}
+            label={t.modeCards.exportMarkdown}
+            doneLabel={t.common.downloaded}
+            onAct={() => downloadText("predict-session.md", buildPredictMarkdown(data, t))}
           />
         </div>
       )}
@@ -431,20 +433,21 @@ function PredictSessionCard({ data }: { data: PredictSessionPayload }) {
   );
 }
 
-function buildPredictMarkdown(d: PredictSessionPayload): string {
+function buildPredictMarkdown(d: PredictSessionPayload, t: Messages): string {
+  const m = t.md;
   const list = d.questions
     .map(
       (q, i) =>
-        `${(i + 1).toString().padStart(2, "0")}. **${q.q}**\n   - 类型：${q.category}\n   - 命中概率：${(q.prob * 100).toFixed(0)}%`,
+        `${(i + 1).toString().padStart(2, "0")}. **${q.q}**\n   - ${m.predictType} ${q.category}\n   - ${m.predictProb} ${(q.prob * 100).toFixed(0)}%`,
     )
     .join("\n\n");
-  return `# 预测题集
+  return `# ${m.predictTitle}
 
-**上下文：** ${d.context}
+**${m.predictContext}** ${d.context}
 
-**高概率方向：** ${d.hottest.join("、")}
+**${m.predictHottest}** ${d.hottest.join("、")}
 
-**生成：${d.questions.length} / ${d.total}**
+**${m.predictGenerated(d.questions.length, d.total)}**
 
 ---
 
@@ -466,6 +469,7 @@ function ProbBar({ pct }: { pct: number }) {
 
 function OptimizeDiffCard({ data }: { data: OptimizeDiffPayload }) {
   const sendUserMessage = useAppStore((s) => s.sendUserMessage);
+  const t = useT();
   const beforeReady = data.before.trim().length > 0;
   const afterReady = data.after.trim().length > 0;
   const isComplete = beforeReady && afterReady;
@@ -475,7 +479,7 @@ function OptimizeDiffCard({ data }: { data: OptimizeDiffPayload }) {
         <Sparkles size={14} strokeWidth={1.8} className="text-primary" />
         <span className="text-sm font-medium text-ink">
           {data.question || (
-            <span className="text-muted-soft">正在识别问题…</span>
+            <span className="text-muted-soft">{t.modeCards.identifyingProblem}</span>
           )}
         </span>
         <div className="flex-1" />
@@ -484,7 +488,7 @@ function OptimizeDiffCard({ data }: { data: OptimizeDiffPayload }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="bg-surface-soft border border-hairline-soft rounded-lg p-4">
           <div className="font-mono text-[10px] font-medium tracking-[0.08em] uppercase text-muted mb-2">
-            Before · 草稿
+            {t.modeCards.beforeLabel}
           </div>
           {beforeReady ? (
             <div className="text-[13px] text-muted leading-[1.6] line-through decoration-[rgba(108,106,100,0.35)] whitespace-pre-wrap">
@@ -496,7 +500,7 @@ function OptimizeDiffCard({ data }: { data: OptimizeDiffPayload }) {
         </div>
         <div className="bg-surface-dark text-on-dark rounded-lg p-4">
           <div className="font-mono text-[10px] font-medium tracking-[0.08em] uppercase text-accent-amber mb-2">
-            After · OC 改写
+            {t.modeCards.afterLabel}
           </div>
           {afterReady ? (
             <div
@@ -514,21 +518,21 @@ function OptimizeDiffCard({ data }: { data: OptimizeDiffPayload }) {
         <div className="flex gap-2 mt-4 flex-wrap">
           <ActionButton
             variant="primary"
-            label="采纳此版本"
-            doneLabel="✓ 已复制"
+            label={t.modeCards.adopt}
+            doneLabel={t.common.copiedShort}
             onAct={() => copyText(data.after)}
           />
           <ActionButton
-            label="再来一版"
-            onAct={() => sendUserMessage("再换一版，思路不同的写法。")}
+            label={t.modeCards.anotherVersion}
+            onAct={() => sendUserMessage(t.modeCards.anotherVersionSend)}
           />
           <ActionButton
-            label="导出 Markdown"
-            doneLabel="✓ 已下载"
+            label={t.modeCards.exportMarkdown}
+            doneLabel={t.common.downloaded}
             onAct={() =>
               downloadText(
                 `${safeFilename(data.question)}.md`,
-                buildOptimizeMarkdown(data),
+                buildOptimizeMarkdown(data, t),
               )
             }
           />
@@ -553,16 +557,17 @@ function Dots({ tone }: { tone: "muted" | "on-dark" }) {
   );
 }
 
-function buildOptimizeMarkdown(d: OptimizeDiffPayload): string {
-  return `# 答案优化 · ${d.tag}
+function buildOptimizeMarkdown(d: OptimizeDiffPayload, t: Messages): string {
+  const m = t.md;
+  return `# ${m.optimizeTitle} · ${d.tag}
 
-**问题：** ${d.question}
+**${m.optimizeQuestion}** ${d.question}
 
-## Before · 草稿
+## ${m.optimizeBefore}
 
 ${d.before}
 
-## After · OC 改写
+## ${m.optimizeAfter}
 
 ${d.after}
 `;

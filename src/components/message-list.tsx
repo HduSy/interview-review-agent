@@ -13,6 +13,7 @@ import { SpikeMark } from "./spike-mark";
 import { ModeCard } from "./mode-cards";
 import { Markdown } from "./markdown";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
 import type { Message } from "@/lib/messages";
 
 const PIN_THRESHOLD_PX = 80;
@@ -22,6 +23,7 @@ export function MessageList({ messages }: { messages: Message[] }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
   const streamingPendingId = useAppStore((s) => s.streamingPendingId);
+  const t = useT();
 
   // Re-evaluate "is user at the bottom" on every scroll. When pinned we
   // follow new content; when not, we surface a floating jump button so
@@ -72,12 +74,12 @@ export function MessageList({ messages }: { messages: Message[] }) {
       {!pinned && (
         <button
           onClick={jumpToBottom}
-          aria-label="跳到最新"
-          title="跳到最新"
+          aria-label={t.messageList.jumpTitle}
+          title={t.messageList.jumpTitle}
           className="sticky bottom-4 ml-auto mr-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-canvas border border-hairline shadow-[0_4px_14px_rgba(20,20,19,0.10)] text-[12px] text-body hover:bg-surface-card transition-colors z-10 -mt-12"
         >
           <ArrowDown size={13} strokeWidth={1.8} />
-          新内容
+          {t.messageList.jumpNew}
         </button>
       )}
     </div>
@@ -94,6 +96,7 @@ const MsgAI = memo(function MsgAI({
   streaming: boolean;
 }) {
   const retryMessage = useAppStore((s) => s.retryMessage);
+  const t = useT();
 
   return (
     <div className="flex gap-3.5 pb-7 group/msg">
@@ -119,7 +122,7 @@ const MsgAI = memo(function MsgAI({
               )
             )}
             {message.aborted && !message.error && (
-              <div className="mt-1.5 text-[11px] text-muted-soft">已停止生成</div>
+              <div className="mt-1.5 text-[11px] text-muted-soft">{t.common.stopped}</div>
             )}
             {message.payload && <ModeCard payload={message.payload} />}
             {!streaming && !message.pending && (
@@ -143,6 +146,7 @@ function Toolbar({
   onRetry: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const t = useT();
   const canRetry = message.error || message.aborted || true; // always show retry
   const canCopy = !message.error && message.content.trim().length > 0;
 
@@ -168,8 +172,8 @@ function Toolbar({
       {canCopy && (
         <button
           onClick={copy}
-          title={copied ? "已复制" : "复制"}
-          aria-label={copied ? "已复制" : "复制"}
+          title={copied ? t.common.copied : t.common.copy}
+          aria-label={copied ? t.common.copied : t.common.copy}
           className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-surface-card hover:text-ink text-[12px]"
         >
           {copied ? (
@@ -182,12 +186,12 @@ function Toolbar({
       {canRetry && (
         <button
           onClick={onRetry}
-          title={message.error ? "重试" : "重新生成"}
-          aria-label={message.error ? "重试" : "重新生成"}
+          title={message.error ? t.messageList.retry : t.messageList.regenerate}
+          aria-label={message.error ? t.messageList.retry : t.messageList.regenerate}
           className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-surface-card hover:text-ink text-[12px]"
         >
           <RefreshCw size={13} strokeWidth={1.8} />
-          {message.error && <span className="ml-0.5">重试</span>}
+          {message.error && <span className="ml-0.5">{t.messageList.retry}</span>}
         </button>
       )}
     </div>

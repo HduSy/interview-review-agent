@@ -1,15 +1,17 @@
 import { create } from "zustand";
 import type { ModeId } from "./commands";
 import { DEFAULT_MODEL } from "./models";
-import { MODE_INTROS, makeId, type Message, type MessagePayload } from "./messages";
+import { makeId, type Message, type MessagePayload } from "./messages";
 import type { RemoteModel } from "@/app/api/models/route";
-import {
-  DEMO_OPTIMIZE,
-  DEMO_PRACTICE,
-  DEMO_PREDICT,
-  DEMO_REVIEW,
-} from "./demo-payloads";
+import { demoPayloads } from "./demo-payloads";
 import { buildSystemPrompt } from "./prompts";
+import {
+  detectLocale,
+  initialLocale,
+  saveLocale,
+  type Locale,
+} from "./i18n/locale";
+import { getActiveLocale, setActiveLocale, tt } from "./i18n/runtime";
 import { resolveModel } from "./model-mapping";
 import { OUTPUT_SPECS } from "./output-specs";
 import {
@@ -52,6 +54,7 @@ export type View =
 type State = {
   view: View;
   chatMode: ModeId;
+  locale: Locale;
   settingsOpen: boolean;
   settingsTab: SettingsTab;
   sidebarExpanded: boolean;
@@ -94,6 +97,7 @@ type Actions = {
   openSettings: (tab?: SettingsTab) => void;
   closeSettings: () => void;
   setSettingsTab: (tab: SettingsTab) => void;
+  setLocale: (locale: Locale) => void;
 
   hydrate: () => Promise<void>;
   updateProfile: (patch: Partial<Profile>) => Promise<void>;
@@ -146,44 +150,53 @@ const PLACEHOLDER_AI_DELAY_MS = 600;
 function placeholderReply(userText: string, mode: ModeId): string {
   const preview = userText.length > 64 ? userText.slice(0, 60) + "…" : userText;
   if (mode === "chat" || mode === "mock") {
-    return `收到 —「${preview}」。请先输入 /setting 配置模型。`;
+    return tt().store.placeholderReply(preview);
   }
   return "";
 }
 
 function payloadFor(mode: ModeId): MessagePayload | undefined {
+  const demo = demoPayloads();
   switch (mode) {
     case "review":
-      return DEMO_REVIEW;
+      return demo.review;
     case "predict":
-      return DEMO_PREDICT;
+      return demo.predict;
     case "optimize":
-      return DEMO_OPTIMIZE;
+      return demo.optimize;
     case "practice":
-      return DEMO_PRACTICE;
+      return demo.practice;
     default:
       return undefined;
   }
 }
 
 function richReplyPreamble(mode: ModeId): string {
+  const p = tt().preamble;
   switch (mode) {
     case "review":
-      return "拿到了，我从 STAR、技术深度、表达三个维度跑了一遍。";
+      return p.review;
     case "predict":
-      return "基于你提供的目标 + 简历，我抽出了 10 道高概率题。";
+      return p.predict;
     case "optimize":
-      return "改写完了 — 下面是 Before / After 对照。";
+      return p.optimize;
     case "practice":
-      return "随机抽一道题，90 秒读题，然后开始作答。";
+      return p.practice;
     default:
       return "";
   }
 }
 
+// Resolve the boot locale from the cookie synchronously (browser only) so the
+// first client render matches the server's cookie-driven HTML — no flash. Also
+// prime the non-React runtime mirror for any tt() call before hydrate runs.
+const BOOT_LOCALE = initialLocale();
+setActiveLocale(BOOT_LOCALE);
+
 export const useAppStore = create<State & Actions>((set, get) => ({
   view: { kind: "chat" },
   chatMode: "chat",
+  locale: BOOT_LOCALE,
   settingsOpen: false,
   settingsTab: "profile",
   sidebarExpanded: false,
@@ -255,8 +268,20 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   closeSettings: () => set({ settingsOpen: false }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
 
+  setLocale: (locale) => {
+    // Mirror into the non-React runtime so prompts / store helpers pick it
+    // up, persist to localStorage, then trigger the reactive update.
+    setActiveLocale(locale);
+    saveLocale(locale);
+    set({ locale });
+  },
+
   hydrate: async () => {
     if (get().hydrated) return;
+    // Resolve persisted / browser locale on mount (client-only) before the
+    // rest so any toast / intro produced during hydration is localized.
+    const locale = detectLocale();
+    setActiveLocale(locale);
     const [profile, apiConfig, rawSessions] = await Promise.all([
       loadProfile(),
       loadApiConfig(),
@@ -267,7 +292,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     // away mid-stream, or a tab crash). Drop it so the session doesn't
     // re-open with a forever-loading bubble.
     const sessions = await scrubStalePendingMessages(rawSessions);
-    set({ profile, apiConfig, sessions, hydrated: true });
+    set({ profile, apiConfig, sessions, locale, hydrated: true });
     // `availableModels` is in-memory only — re-fetch on every page load
     // so the model picker doesn't render "无可用模型" with a valid key.
     if (apiConfig.apiKey.trim()) void get().fetchModels();
@@ -409,7 +434,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       set({ modelsLoading: false, modelsError: msg, availableModels: [] });
-      get().pushToast(`拉取模型失败：${msg}`, "error");
+      get().pushToast(tt().store.fetchModelsFailed(msg), "error");
     }
   },
 
@@ -523,12 +548,12 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       content:
         introMode === "practice"
           ? richReplyPreamble(introMode)
-          : MODE_INTROS[introMode],
+          : tt().modeIntros[introMode],
       mode,
       createdAt: Date.now(),
     };
     if (introMode === "practice") {
-      intro.payload = DEMO_PRACTICE;
+      intro.payload = demoPayloads().practice;
     }
     set({ messages: [intro] });
   },
@@ -654,7 +679,7 @@ async function streamReply({
         ) => Partial<ReturnType<typeof useAppStore.getState>>),
   ) => void;
 }) {
-  const system = buildSystemPrompt(mode, profile);
+  const system = buildSystemPrompt(mode, profile, getActiveLocale());
   const model = resolveModel(
     apiConfig.provider,
     modelId,
@@ -684,7 +709,7 @@ async function streamReply({
 
   const apiMessages = normalizeForApi(priorMessages);
   if (apiMessages.length === 0) {
-    applyAssistant({ content: "还没有可发送的用户消息", error: true });
+    applyAssistant({ content: tt().store.noUserMessage, error: true });
     set((s) => ({
       streamingPendingId: s.streamingPendingId === pendingId ? null : s.streamingPendingId,
     }));
@@ -717,7 +742,7 @@ async function streamReply({
     });
 
     if (!res.ok || !res.body) {
-      const errText = await res.text().catch(() => "请求失败");
+      const errText = await res.text().catch(() => tt().store.requestFailed);
       applyAssistant({ content: errText, error: true });
       return;
     }
@@ -820,7 +845,7 @@ async function streamReply({
       }));
     } else {
       const msg = err instanceof Error ? err.message : String(err);
-      applyAssistant({ content: `调用失败：${msg}`, error: true });
+      applyAssistant({ content: tt().store.callFailed(msg), error: true });
     }
   } finally {
     if (activeAbortController === controller) activeAbortController = null;
@@ -875,8 +900,7 @@ async function maybeGenerateTitle(args: {
         apiKey: args.apiConfig.apiKey,
         baseURL: args.apiConfig.baseURL,
         model,
-        system:
-          "你是会话命名助手。读取一段用户提问和 AI 回答，输出一个 6-14 个汉字（或等长英文）的标题，概括话题核心。直接输出标题文本，不要引号、不要解释、不要标点结尾。",
+        system: tt().store.titleSystemPrompt,
         messages: [{ role: "user", content: sample }],
       }),
     });

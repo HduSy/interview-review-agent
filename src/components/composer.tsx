@@ -18,6 +18,7 @@ import {
 import clsx from "clsx";
 import { COMMANDS, type CommandDef } from "@/lib/commands";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
 import { modelSupportsVision } from "@/lib/model-capabilities";
 import { SlashPalette } from "./slash-palette";
 import { ModelPicker } from "./model-picker";
@@ -87,10 +88,11 @@ function iconForKind(kind: FileKind): React.ReactNode {
 }
 
 export function Composer({
-  placeholder = "问点什么，或输入 / 调用命令…",
+  placeholder,
 }: {
   placeholder?: string;
 }) {
+  const t = useT();
   const activateChatMode = useAppStore((s) => s.activateChatMode);
   const sendUserMessage = useAppStore((s) => s.sendUserMessage);
   const stopStreaming = useAppStore((s) => s.stopStreaming);
@@ -238,14 +240,14 @@ export function Composer({
     if (!v && attachments.length === 0) return;
     const parts: string[] = [];
     if (attachResume && profile.resumeFileName) {
-      parts.push(`（附加简历上下文：${profile.resumeFileName}）`);
+      parts.push(t.composer.attachResumeLine(profile.resumeFileName));
     }
     for (const a of attachments) {
       const sizeKB = (a.size / 1024).toFixed(1);
       if (a.text) {
-        parts.push(`（附件：${a.name} · ${sizeKB} KB）\n\n\`\`\`\n${a.text}\n\`\`\``);
+        parts.push(t.composer.attachInlineLine(a.name, sizeKB, a.text));
       } else {
-        parts.push(`（附件：${a.name} · ${sizeKB} KB · 二进制，未内联）`);
+        parts.push(t.composer.attachBinaryLine(a.name, sizeKB));
       }
     }
     if (v) parts.push(v);
@@ -334,7 +336,7 @@ export function Composer({
                 <Chip
                   icon={<Sparkles size={12} strokeWidth={1.8} />}
                   label={profile.resumeFileName}
-                  hint="简历上下文"
+                  hint={t.composer.resumeChipHint}
                   onRemove={() => setAttachResume(false)}
                 />
               )}
@@ -346,7 +348,7 @@ export function Composer({
                       <button
                         type="button"
                         onClick={() => setPreviewImage(a)}
-                        title="预览"
+                        title={t.common.preview}
                         className="block w-5 h-5 rounded overflow-hidden bg-canvas border border-hairline shrink-0 hover:opacity-80 transition-opacity"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -361,7 +363,7 @@ export function Composer({
                     )
                   }
                   label={a.name}
-                  hint={`${(a.size / 1024).toFixed(1)} KB${a.text ? "" : a.imageUrl ? "" : " · 二进制"}`}
+                  hint={`${(a.size / 1024).toFixed(1)} KB${a.text ? "" : a.imageUrl ? "" : ` · ${t.common.binary}`}`}
                   onRemove={() => removeAttachment(a.id)}
                 />
               ))}
@@ -370,7 +372,7 @@ export function Composer({
           <textarea
             ref={textareaRef}
             value={value}
-            placeholder={placeholder}
+            placeholder={placeholder ?? t.composer.placeholder}
             onChange={(e) => setValue(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
@@ -388,8 +390,8 @@ export function Composer({
               disabled={!supportsVision}
               title={
                 supportsVision
-                  ? "上传文件"
-                  : `当前模型「${effectiveModelId}」可能不支持图片 / 文件，切换到 Claude / GPT-4o / Gemini 等多模态模型`
+                  ? t.composer.uploadFile
+                  : t.composer.unsupportedModel(effectiveModelId)
               }
               className={clsx(
                 "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-hairline text-muted transition-colors",
@@ -406,12 +408,12 @@ export function Composer({
               disabled={!supportsVision}
               title={
                 !supportsVision
-                  ? `当前模型「${effectiveModelId}」可能不支持图片 / 文件，切换到 Claude / GPT-4o / Gemini 等多模态模型`
+                  ? t.composer.unsupportedModel(effectiveModelId)
                   : profile.resumeFileName
                     ? attachResume
-                      ? `取消附加：${profile.resumeFileName}`
-                      : `附加：${profile.resumeFileName}`
-                    : "尚未上传简历，点击去设置"
+                      ? t.composer.resumeCancel(profile.resumeFileName)
+                      : t.composer.resumeAttach(profile.resumeFileName)
+                    : t.composer.resumeSetup
               }
               className={clsx(
                 "inline-flex items-center justify-center px-2.5 py-1.5 rounded-md border transition-colors",
@@ -430,8 +432,8 @@ export function Composer({
               <button
                 type="button"
                 onClick={stopStreaming}
-                title="停止生成"
-                aria-label="停止生成"
+                title={t.common.stop}
+                aria-label={t.common.stop}
                 className="w-8 h-8 rounded-md flex items-center justify-center bg-ink text-white hover:opacity-90 transition-opacity"
               >
                 <Square size={12} strokeWidth={2} fill="currentColor" />
@@ -479,6 +481,7 @@ function ImageLightbox({
   alt: string;
   onClose: () => void;
 }) {
+  const t = useT();
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -551,7 +554,7 @@ function ImageLightbox({
     <div
       role="dialog"
       aria-modal
-      aria-label={`预览：${alt}`}
+      aria-label={`${t.common.preview}: ${alt}`}
       onClick={onClose}
       className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6 sm:p-12 cursor-zoom-out overflow-hidden"
     >
@@ -580,7 +583,7 @@ function ImageLightbox({
       <button
         type="button"
         onClick={onClose}
-        aria-label="关闭预览"
+        aria-label={t.common.closePreview}
         className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-md bg-white/10 text-white hover:bg-white/20 transition-colors"
       >
         <X size={18} strokeWidth={1.8} />
@@ -590,7 +593,7 @@ function ImageLightbox({
         <span className="text-white/50">·</span>
         <span className="tabular-nums">{Math.round(scale * 100)}%</span>
         <span className="text-white/40 text-[11px] hidden sm:inline">
-          滚轮缩放 · 双击复位
+          {t.composer.zoomHint}
         </span>
       </div>
     </div>
@@ -608,6 +611,7 @@ function Chip({
   hint?: string;
   onRemove: () => void;
 }) {
+  const t = useT();
   return (
     <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-card text-ink text-[12px] max-w-[260px]">
       <span className="text-muted shrink-0">{icon}</span>
@@ -620,7 +624,7 @@ function Chip({
       <button
         onClick={onRemove}
         className="text-muted hover:text-ink shrink-0 -mr-0.5"
-        aria-label="移除"
+        aria-label={t.common.remove}
       >
         <X size={11} strokeWidth={2.2} />
       </button>

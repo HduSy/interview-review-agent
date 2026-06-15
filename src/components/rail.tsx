@@ -4,6 +4,7 @@ import { Github, PanelLeft, Settings as SettingsIcon } from "lucide-react";
 import clsx from "clsx";
 import { RAIL_MODES } from "@/lib/commands";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
 
 export function Rail() {
   const view = useAppStore((s) => s.view);
@@ -13,6 +14,7 @@ export function Rail() {
   const expandSidebar = useAppStore((s) => s.expandSidebar);
   const githubUser = useAppStore((s) => s.githubUser);
   const authChecked = useAppStore((s) => s.authChecked);
+  const t = useT();
 
   const activeMode = view.kind === "history" ? view.mode : "chat";
 
@@ -20,8 +22,8 @@ export function Rail() {
     <aside className="w-16 bg-surface-soft border-r border-hairline px-3 py-4 flex flex-col items-center gap-2.5 shrink-0">
       <button
         onClick={expandSidebar}
-        aria-label="展开侧栏"
-        title="展开侧栏"
+        aria-label={t.rail.expand}
+        title={t.rail.expand}
         className="w-10 h-10 flex items-center justify-center rounded-md hover:bg-surface-card text-muted hover:text-ink"
       >
         <PanelLeft size={18} strokeWidth={1.6} />
@@ -61,7 +63,7 @@ export function Rail() {
       {githubUser ? (
         <button
           onClick={() => openSettings()}
-          title={`@${githubUser.login} · 打开设置`}
+          title={t.rail.profileTip(githubUser.login)}
           className="w-8 h-8 rounded-full overflow-hidden bg-surface-card mt-1.5 hover:opacity-90"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -74,7 +76,7 @@ export function Rail() {
       ) : (
         <a
           href={authChecked ? "/api/auth/github" : undefined}
-          title={authChecked ? "登录 GitHub" : ""}
+          title={authChecked ? t.rail.loginGithub : ""}
           className={clsx(
             "w-8 h-8 rounded-full flex items-center justify-center mt-1.5 transition-colors",
             authChecked

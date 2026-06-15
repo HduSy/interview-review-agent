@@ -6,6 +6,7 @@ import { Github, PanelLeft, Plus, Settings as SettingsIcon } from "lucide-react"
 import { Wordmark } from "./spike-mark";
 import { RAIL_MODES, type ModeId } from "@/lib/commands";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n/use-t";
 
 export function ExpandedSidebar() {
   const view = useAppStore((s) => s.view);
@@ -18,6 +19,7 @@ export function ExpandedSidebar() {
   const sessions = useAppStore((s) => s.sessions);
   const githubUser = useAppStore((s) => s.githubUser);
   const authChecked = useAppStore((s) => s.authChecked);
+  const t = useT();
 
   const sessionCountByMode = useMemo(() => {
     const counts: Record<ModeId, number> = {
@@ -39,16 +41,16 @@ export function ExpandedSidebar() {
       <div className="flex items-center justify-between mb-4 px-1">
         <button
           onClick={newChat}
-          title="回到首页"
-          aria-label="回到首页"
+          title={t.sidebar.backHome}
+          aria-label={t.sidebar.backHome}
           className="-ml-1 px-1 py-1 rounded-md hover:bg-surface-card transition-colors"
         >
           <Wordmark size={18} />
         </button>
         <button
           onClick={collapseSidebar}
-          aria-label="收起侧栏"
-          title="收起侧栏"
+          aria-label={t.sidebar.collapse}
+          title={t.sidebar.collapse}
           className="w-10 h-10 flex items-center justify-center rounded-md text-muted hover:text-ink hover:bg-surface-card -mr-2"
         >
           <PanelLeft size={18} strokeWidth={1.6} />
@@ -59,10 +61,10 @@ export function ExpandedSidebar() {
         className="flex items-center gap-2 px-3 py-2 bg-ink text-white rounded-md text-[13px] font-medium hover:opacity-90 mb-4"
       >
         <Plus size={14} strokeWidth={2} className="text-white" />
-        New chat
+        {t.sidebar.newChat}
       </button>
       <div className="text-[11px] font-medium tracking-[0.12em] uppercase text-muted-soft px-3 pt-2 pb-1.5">
-        Modes
+        {t.sidebar.modes}
       </div>
       {RAIL_MODES.map((m) => {
         const Icon = m.icon;
@@ -93,13 +95,13 @@ export function ExpandedSidebar() {
       })}
       <div className="h-px bg-hairline mx-2 my-4" />
       <div className="text-[11px] font-medium tracking-[0.12em] uppercase text-muted-soft px-3 pb-1.5">
-        Recent
+        {t.sidebar.recent}
       </div>
       {sessions.length === 0 ? (
         <div className="px-3 py-2 text-[12px] text-muted-soft leading-relaxed">
-          还没有会话。发一句试试 —
+          {t.sidebar.recentEmpty1}
           <br />
-          这里会列出最近 6 条。
+          {t.sidebar.recentEmpty2}
         </div>
       ) : (
         sessions.slice(0, 6).map((s) => {
@@ -154,7 +156,7 @@ export function ExpandedSidebar() {
                 href="/api/auth/github"
                 className="text-[13px] text-primary font-medium hover:underline self-start"
               >
-                登录 GitHub
+                {t.sidebar.loginGithub}
               </a>
             ) : (
               <span className="text-[13px] text-muted-soft">…</span>
@@ -162,8 +164,8 @@ export function ExpandedSidebar() {
           </div>
           <button
             onClick={() => openSettings()}
-            aria-label="打开设置"
-            title="打开设置"
+            aria-label={t.sidebar.openSettings}
+            title={t.sidebar.openSettings}
             className="w-7 h-7 flex items-center justify-center rounded-md text-muted hover:bg-surface-card shrink-0"
           >
             <SettingsIcon size={15} strokeWidth={1.6} />
