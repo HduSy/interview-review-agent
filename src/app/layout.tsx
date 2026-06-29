@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Inter, Cormorant_Garamond, EB_Garamond, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/locale";
 import { MESSAGES } from "@/lib/i18n/messages";
@@ -168,6 +169,7 @@ export default async function RootLayout({
       <body className="min-h-full">
         {children}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
