@@ -385,7 +385,7 @@ export const en: Messages = {
     titleDefault: "OC-Review · The AI-Native Interview Coach",
     titleTemplate: "%s · OC-Review",
     description:
-      "OC-Review is an AI-native interview coach: run mock interviews, debrief past ones, score and rewrite answers with the STAR method, predict likely questions, and polish your responses — all in the browser. No sign-up, your profile and résumé travel as context, and your API key stays local. Switch freely across Claude / GPT / Gemini / Zhipu.",
+      "AI-native interview coach in your browser: mock interviews, debriefs, STAR scoring and rewrites, question prediction, and answer polishing. No sign-up — your API key stays local. Works with Claude / GPT / Gemini / Zhipu.",
     ogLocale: "en_US",
     htmlLang: "en",
     keywords: [

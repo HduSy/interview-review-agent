@@ -73,15 +73,60 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const htmlLang = MESSAGES[await requestLocale()].meta.htmlLang;
+  const m = MESSAGES[await requestLocale()].meta;
+  const htmlLang = m.htmlLang;
+
+  // schema.org structured data — makes the app eligible for rich results and
+  // gives crawlers an explicit entity to attach to. Locale-aware so name /
+  // description match the served language. Rendered as a raw <script>, the
+  // Next-recommended way to ship JSON-LD (the Metadata API has no field for it).
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#website`,
+        url: SITE_URL,
+        name: "OC-Review",
+        description: m.description,
+        inLanguage: htmlLang,
+        publisher: { "@id": `${SITE_URL}/#org` },
+      },
+      {
+        "@type": "Organization",
+        "@id": `${SITE_URL}/#org`,
+        name: "OC-Review",
+        url: SITE_URL,
+        logo: `${SITE_URL}/apple-icon`,
+      },
+      {
+        "@type": "WebApplication",
+        name: m.titleDefault,
+        url: SITE_URL,
+        description: m.description,
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web",
+        browserRequirements: "Requires JavaScript.",
+        inLanguage: htmlLang,
+        publisher: { "@id": `${SITE_URL}/#org` },
+        offers: { "@type": "Offer", price: "0", priceCurrency: "CNY" },
+      },
+    ],
+  };
+
   return (
     <html lang={htmlLang} className="h-full antialiased">
       <head>
+        <meta httpEquiv="content-language" content={htmlLang} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
       <body className="min-h-full">{children}</body>
