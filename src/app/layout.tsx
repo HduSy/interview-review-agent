@@ -1,19 +1,52 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
+import { Inter, Cormorant_Garamond, EB_Garamond, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { DEFAULT_LOCALE, LOCALE_COOKIE, type Locale } from "@/lib/i18n/locale";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/locale";
 import { MESSAGES } from "@/lib/i18n/messages";
 
 const SITE_URL = process.env.APP_ORIGIN ?? "https://findfunplus.cn";
 
-/** Locale for this request, from the cookie the client sets on switch. */
+// Self-hosted via next/font: fonts are downloaded at build time and served
+// from /_next/static, so there's no render-blocking request to fonts.googleapis
+// and no layout shift. Each exposes a CSS variable consumed by globals.css.
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-inter",
+  display: "swap",
+});
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-cormorant",
+  display: "swap",
+});
+const ebGaramond = EB_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-eb-garamond",
+  display: "swap",
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
+const fontVars = `${inter.variable} ${cormorant.variable} ${ebGaramond.variable} ${jetbrainsMono.variable}`;
+
+/** Locale for this request, derived from the URL path by middleware. */
 async function requestLocale(): Promise<Locale> {
-  const v = (await cookies()).get(LOCALE_COOKIE)?.value;
+  const v = (await headers()).get("x-oc-locale");
   return v === "zh" || v === "en" ? v : DEFAULT_LOCALE;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const m = MESSAGES[await requestLocale()].meta;
+  const locale = await requestLocale();
+  const m = MESSAGES[locale].meta;
+  const canonical = locale === "zh" ? "/zh" : "/";
   return {
     metadataBase: new URL(SITE_URL),
     title: {
@@ -27,12 +60,19 @@ export async function generateMetadata(): Promise<Metadata> {
     generator: "Next.js",
     referrer: "origin-when-cross-origin",
     alternates: {
-      canonical: "/",
+      canonical,
+      // hreflang cluster — every variant lists itself + the others + x-default,
+      // so the pair is reciprocal (Google drops one-directional pairs).
+      languages: {
+        en: "/",
+        "zh-Hans": "/zh",
+        "x-default": "/",
+      },
     },
     openGraph: {
       type: "website",
       locale: m.ogLocale,
-      url: "/",
+      url: canonical,
       siteName: "OC-Review",
       title: m.titleDefault,
       description: m.description,
@@ -73,20 +113,21 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const m = MESSAGES[await requestLocale()].meta;
+  const locale = await requestLocale();
+  const m = MESSAGES[locale].meta;
   const htmlLang = m.htmlLang;
+  const canonical = locale === "zh" ? `${SITE_URL}/zh` : `${SITE_URL}/`;
 
   // schema.org structured data — makes the app eligible for rich results and
   // gives crawlers an explicit entity to attach to. Locale-aware so name /
-  // description match the served language. Rendered as a raw <script>, the
-  // Next-recommended way to ship JSON-LD (the Metadata API has no field for it).
+  // description / inLanguage match the served language.
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "WebSite",
         "@id": `${SITE_URL}/#website`,
-        url: SITE_URL,
+        url: canonical,
         name: "OC-Review",
         description: m.description,
         inLanguage: htmlLang,
@@ -102,7 +143,7 @@ export default async function RootLayout({
       {
         "@type": "WebApplication",
         name: m.titleDefault,
-        url: SITE_URL,
+        url: canonical,
         description: m.description,
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",
@@ -115,15 +156,9 @@ export default async function RootLayout({
   };
 
   return (
-    <html lang={htmlLang} className="h-full antialiased">
+    <html lang={htmlLang} className={`h-full antialiased ${fontVars}`}>
       <head>
         <meta httpEquiv="content-language" content={htmlLang} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

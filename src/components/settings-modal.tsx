@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Eye, EyeOff, Settings as SettingsIcon, Upload, X } from "lucide-react";
 import clsx from "clsx";
 import { useAppStore } from "@/lib/store";
@@ -113,8 +114,17 @@ export function SettingsModal() {
 function LanguageToggle() {
   const locale = useAppStore((s) => s.locale);
   const setLocale = useAppStore((s) => s.setLocale);
+  const router = useRouter();
   const t = useT();
   const labels: Record<Locale, string> = { zh: t.language.zh, en: t.language.en };
+  // Locale lives in the URL now (/ = en, /zh = zh) so search engines can index
+  // each language. Switching navigates there; setLocale updates the store
+  // immediately for instant UI feedback before the route transition lands.
+  const switchTo = (l: Locale) => {
+    if (l === locale) return;
+    setLocale(l);
+    router.push(l === "zh" ? "/zh" : "/");
+  };
   return (
     <div
       role="group"
@@ -124,7 +134,7 @@ function LanguageToggle() {
       {LOCALES.map((l) => (
         <button
           key={l}
-          onClick={() => setLocale(l)}
+          onClick={() => switchTo(l)}
           className={clsx(
             "px-2 py-0.5 rounded text-[12px] font-medium transition-colors",
             locale === l

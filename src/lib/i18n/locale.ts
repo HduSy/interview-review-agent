@@ -1,7 +1,9 @@
 export type Locale = "zh" | "en";
 
 export const LOCALES: Locale[] = ["zh", "en"];
-export const DEFAULT_LOCALE: Locale = "zh";
+// Root `/` serves English and is the x-default; Chinese lives at /zh. So the
+// fallback locale (no cookie, no path match) is English.
+export const DEFAULT_LOCALE: Locale = "en";
 
 /** Name of the cookie + localStorage key holding the locale choice. */
 export const LOCALE_COOKIE = "oc-locale";
