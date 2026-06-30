@@ -17,19 +17,28 @@ const languages = {
   "x-default": `${SITE_URL}/`,
 };
 
+/**
+ * Last meaningful change to the landing copy. Google treats <lastmod> as a
+ * freshness HINT and discounts values that change on every deploy without a
+ * real content change — so this is a stable date, NOT `new Date()` at build
+ * time (which would always report "today" and carry no signal). Bump it when
+ * the marketing copy on `/` or `/zh` actually changes. The two mirrors share
+ * one date because the locales change together.
+ */
+const LAST_UPDATED = new Date("2026-06-30");
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
   return [
     {
       url: `${SITE_URL}/`,
-      lastModified,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 1,
       alternates: { languages },
     },
     {
       url: `${SITE_URL}/zh`,
-      lastModified,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 1,
       alternates: { languages },

@@ -49,6 +49,20 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await requestLocale();
   const m = MESSAGES[locale].meta;
   const canonical = locale === "zh" ? "/zh" : "/";
+
+  // Search-engine site-verification meta. Each token comes from the matching
+  // webmaster console (Baidu / Bing / Google) and is deployment-specific, so we
+  // read it from env and only emit the tag when the value is set — unset renders
+  // no empty <meta>. For a .cn domain, baidu-site-verification is the one that
+  // matters most. These land in public HTML, so no NEXT_PUBLIC_ prefix is needed
+  // (generateMetadata runs server-side).
+  const verification: NonNullable<Metadata["verification"]> = {};
+  const other: Record<string, string> = {};
+  if (process.env.GOOGLE_SITE_VERIFICATION) verification.google = process.env.GOOGLE_SITE_VERIFICATION;
+  if (process.env.BING_SITE_VERIFICATION) other["msvalidate.01"] = process.env.BING_SITE_VERIFICATION;
+  if (process.env.BAIDU_SITE_VERIFICATION) other["baidu-site-verification"] = process.env.BAIDU_SITE_VERIFICATION;
+  if (Object.keys(other).length > 0) verification.other = other;
+
   return {
     metadataBase: new URL(SITE_URL),
     title: {
@@ -96,8 +110,10 @@ export async function generateMetadata(): Promise<Metadata> {
         "max-video-preview": -1,
       },
     },
-    // 国内搜索引擎的站长验证 meta 一般在站长平台拿到验证字符串后填进去。
-    // verification: { other: { "baidu-site-verification": "...", "msvalidate.01": "...", "google-site-verification": "..." } },
+    // Emits google-site-verification / msvalidate.01 (Bing) /
+    // baidu-site-verification <meta> tags only when the matching env var is set
+    // (see the build block above). Omitted entirely when nothing is configured.
+    ...(Object.keys(verification).length > 0 ? { verification } : {}),
   };
 }
 
