@@ -243,7 +243,7 @@ export const zh = {
     profile: {
       targetRole: "目标岗位 *",
       targetRoleHint: "必填",
-      targetRolePh: "高级前端工程师",
+      targetRolePh: "高级研发工程师",
       yearsExp: "工作年限",
       yearsExpPh: "3 年",
       techStack: "技术栈",
@@ -338,16 +338,16 @@ export const zh = {
     profileTechStack: (v: string) => `技术栈：${v}`,
     profileCompanies: (v: string) => `目标公司：${v}`,
     profileResume: (v: string) => `简历：${v}（已解析）`,
-    profileEmpty: "（用户尚未填写画像 — 可主动询问或按通用前端工程师默认）",
+    profileEmpty: "（用户尚未填写画像 — 不要默认任何具体岗位或方向。若对话中已透露目标岗位就以那个为准；否则先简短问一句用户的目标研发方向（如前端 / 后端 / 全栈 / AI / 算法 / 客户端 / 数据），确认后再据此出题与评分。）",
     roles: {
       chat: "当前在自由聊天模式 — 任何关于面试准备、技术问题、职业规划的话题都可以谈。回答简洁，给可操作的建议。",
       mock: "当前在模拟面试模式。按用户的目标公司 / 岗位的风格扮演面试官 — 提一个问题，等待用户回答，再追问。每轮只问一个问题，深挖到细节。不要给评分或反馈，等用户主动求评再说。",
       review:
         "当前在复盘模式。用户会粘贴一段面试记录或自述。请从 STAR 结构、技术深度、表达清晰度、量化指标四个维度给结构化反馈。先给一句总评，再列做得好的 3 条 + 下次试试 3 条，最后给一段重写示范。",
       practice:
-        "当前在随堂练习模式。基于用户画像随机出一题（行为面 / 系统设计 / 算法 / 概念 任选）。题干要具体、有上下文。用户作答后，按可扩展性、性能直觉、取舍说明、边界情况四个维度评分并给改进建议。",
+        "当前在随堂练习模式。基于用户画像随机出一题（行为面 / 系统设计 / 算法 / 概念 / 工程实践 任选，按用户岗位方向合理选取）。题干要具体、有上下文。用户作答后，按 4 个维度评分并给改进建议——维度须贴合岗位，不要对所有人套用同一套：如后端 / 系统侧重可扩展性、一致性、取舍、边界；前端侧重可维护性、性能、可访问性、组件设计；算法侧重复杂度、正确性、数据结构取舍、边界；AI 侧重建模思路、数据、评估、取舍。",
       predict:
-        "当前在题目预测模式。基于用户提供的 JD / 目标公司 + 简历，生成 8–12 道可能被问到的题目，按概率从高到低排列。每题标记 category（前端 / 系统设计 / 行为 / 算法 等）和命中概率（0–100）。最后列出 3 个最高概率的方向作为重点。",
+        "当前在题目预测模式。基于用户提供的 JD / 目标公司 + 简历，生成 8–12 道可能被问到的题目，按概率从高到低排列。每题标记 category（按岗位合理选择，例如 前端 / 后端 / 系统设计 / 算法 / AI 与机器学习 / 数据 / 工程实践 / 行为 等）和命中概率（0–100）。最后列出 3 个最高概率的方向作为重点。",
       optimize: "当前在答案优化模式。用户会贴一段答案草稿，按下面的格式产出改写。",
     },
   },
@@ -588,7 +588,7 @@ export const en: Messages = {
     profile: {
       targetRole: "Target role *",
       targetRoleHint: "required",
-      targetRolePh: "Senior Frontend Engineer",
+      targetRolePh: "Senior Engineer",
       yearsExp: "Years of experience",
       yearsExpPh: "3 yrs",
       techStack: "Tech stack",
@@ -683,16 +683,16 @@ export const en: Messages = {
     profileTechStack: (v: string) => `Tech stack: ${v}`,
     profileCompanies: (v: string) => `Target companies: ${v}`,
     profileResume: (v: string) => `Résumé: ${v} (parsed)`,
-    profileEmpty: "(User hasn't filled their profile yet — ask proactively or default to a generic frontend engineer.)",
+    profileEmpty: "(User hasn't filled their profile yet — do NOT default to any specific role or focus. If the role has already come up in conversation, use that; otherwise briefly ask for their target engineering focus first (e.g., frontend / backend / full-stack / AI / algorithm / client / data), then tailor questions and scoring to it.)",
     roles: {
       chat: "Currently in free chat mode — any topic about interview prep, technical questions, or career planning is welcome. Keep answers concise and give actionable advice.",
       mock: "Currently in mock interview mode. Play the interviewer in the style of the user's target company / role — ask one question, wait for the answer, then follow up. One question per turn, dig into detail. Don't give scores or feedback until the user explicitly asks.",
       review:
         "Currently in review mode. The user pastes an interview transcript or self-report. Give structured feedback across four dimensions: STAR structure, technical depth, clarity, and quantified results. Start with a one-line overall take, then list 3 strengths + 3 things to try next time, and finally a rewrite demo.",
       practice:
-        "Currently in practice mode. Draw one random question based on the user's profile (behavioral / system design / algorithm / concept). The prompt must be specific and have context. After the user answers, score across scalability, performance intuition, trade-off articulation, and edge cases, with improvement suggestions.",
+        "Currently in practice mode. Draw one random question based on the user's profile (behavioral / system design / algorithm / concept / engineering practice — pick what fits the user's focus). The prompt must be specific and have context. After the user answers, score across 4 dimensions tailored to the role — do not use one fixed rubric for everyone: backend / systems → scalability, consistency, trade-offs, edge cases; frontend → maintainability, performance, accessibility, component design; algorithm → complexity, correctness, data-structure trade-offs, edge cases; AI → modeling approach, data, evaluation, trade-offs.",
       predict:
-        "Currently in question-prediction mode. From the user's JD / target company + résumé, generate 8–12 likely questions ranked by probability, highest first. Tag each with a category (frontend / system design / behavioral / algorithm, etc.) and a hit probability (0–100). End with the 3 highest-probability directions as focus areas.",
+        "Currently in question-prediction mode. From the user's JD / target company + résumé, generate 8–12 likely questions ranked by probability, highest first. Tag each with a category chosen to fit the role (e.g., frontend / backend / system design / algorithm / AI & ML / data / engineering practice / behavioral) and a hit probability (0–100). End with the 3 highest-probability directions as focus areas.",
       optimize: "Currently in answer-optimization mode. The user pastes a draft answer; produce a rewrite in the format below.",
     },
   },
