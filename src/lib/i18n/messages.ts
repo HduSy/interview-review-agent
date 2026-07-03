@@ -259,6 +259,8 @@ export const zh = {
       resumeReplace: "替换",
       resumeDelete: "删除简历",
       resumeUpload: "点击上传 PDF 简历",
+      resumeUploading: "正在上传…",
+      resumeUploadFailed: "简历上传失败，请重试",
       resumeSaved: (kb: string) => `${kb} KB · 已保存到本地`,
     },
     api: {
@@ -604,6 +606,8 @@ export const en: Messages = {
       resumeReplace: "Replace",
       resumeDelete: "Delete résumé",
       resumeUpload: "Click to upload a PDF résumé",
+      resumeUploading: "Uploading…",
+      resumeUploadFailed: "Résumé upload failed, please retry",
       resumeSaved: (kb: string) => `${kb} KB · saved locally`,
     },
     api: {

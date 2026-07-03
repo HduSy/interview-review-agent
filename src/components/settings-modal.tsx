@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Eye, EyeOff, Settings as SettingsIcon, Upload, X } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, Settings as SettingsIcon, Upload, X } from "lucide-react";
 import clsx from "clsx";
 import { useAppStore } from "@/lib/store";
 import type { Provider } from "@/lib/db";
@@ -182,6 +182,8 @@ function ProfileTab() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [newTech, setNewTech] = useState("");
   const [newCompany, setNewCompany] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const pushToast = useAppStore((s) => s.pushToast);
 
   function removeChip(list: string[], value: string) {
     return list.filter((v) => v !== value);
@@ -317,10 +319,18 @@ function ProfileTab() {
           type="file"
           accept=".pdf,application/pdf"
           className="hidden"
-          onChange={(e) => {
+          onChange={async (e) => {
             const f = e.target.files?.[0];
-            if (f) uploadResume(f);
             e.target.value = "";
+            if (!f) return;
+            setUploading(true);
+            try {
+              await uploadResume(f);
+            } catch {
+              pushToast(tp.resumeUploadFailed, "error");
+            } finally {
+              setUploading(false);
+            }
           }}
         />
         {profile.resumeBlobId ? (
@@ -338,14 +348,20 @@ function ProfileTab() {
             </div>
             <button
               onClick={() => fileRef.current?.click()}
-              className="bg-canvas text-ink border border-hairline text-[13px] font-medium px-3 py-1.5 rounded-md hover:bg-surface-card inline-flex items-center gap-1.5"
+              disabled={uploading}
+              className="bg-canvas text-ink border border-hairline text-[13px] font-medium px-3 py-1.5 rounded-md hover:bg-surface-card disabled:text-muted-soft disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
-              <Upload size={13} strokeWidth={1.8} />
-              {tp.resumeReplace}
+              {uploading ? (
+                <Loader2 size={13} strokeWidth={1.8} className="animate-spin" />
+              ) : (
+                <Upload size={13} strokeWidth={1.8} />
+              )}
+              {uploading ? tp.resumeUploading : tp.resumeReplace}
             </button>
             <button
               onClick={() => removeResume()}
-              className="text-muted hover:text-ink p-1.5"
+              disabled={uploading}
+              className="text-muted hover:text-ink p-1.5 disabled:text-muted-soft disabled:cursor-not-allowed"
               aria-label={tp.resumeDelete}
             >
               <X size={14} strokeWidth={1.8} />
@@ -354,10 +370,15 @@ function ProfileTab() {
         ) : (
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-full px-4 py-6 bg-canvas border border-dashed border-hairline rounded-xl text-muted hover:border-primary/40 hover:text-ink inline-flex items-center justify-center gap-2 text-[13px]"
+            disabled={uploading}
+            className="w-full px-4 py-6 bg-canvas border border-dashed border-hairline rounded-xl text-muted hover:border-primary/40 hover:text-ink disabled:text-muted-soft disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 text-[13px]"
           >
-            <Upload size={14} strokeWidth={1.8} />
-            {tp.resumeUpload}
+            {uploading ? (
+              <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />
+            ) : (
+              <Upload size={14} strokeWidth={1.8} />
+            )}
+            {uploading ? tp.resumeUploading : tp.resumeUpload}
           </button>
         )}
       </Field>
