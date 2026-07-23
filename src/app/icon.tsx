@@ -5,8 +5,12 @@ export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
 /**
- * 32×32 favicon — 暗炭灰底 + 奶油色火花 + 珊瑚核心点。
- * 珊瑚点是品牌的"双色火花"语汇，所有尺寸都保留。
+ * 32×32 favicon — coral 圆角方块底 + cream 对话气泡 + ink 对勾。
+ *
+ * 替代原"暗底火花"设计。新语义：
+ *  - coral 方块 = 品牌主色温度，小尺寸下识别度高于暗底
+ *  - 气泡 + 对勾 = 对话即界面 + 复盘通过
+ *
  * 圆角 28%（连续圆角风），匹配应用图标节奏。
  */
 export default function Icon() {
@@ -16,7 +20,7 @@ export default function Icon() {
         style={{
           width: "100%",
           height: "100%",
-          background: "#181715",
+          background: "#cc785c",
           borderRadius: "28%",
           display: "flex",
           alignItems: "center",
@@ -25,10 +29,17 @@ export default function Icon() {
       >
         <svg width="22" height="22" viewBox="0 0 64 64" fill="none">
           <path
-            d="M32 3 Q39.5 24.5 61 32 Q39.5 39.5 32 61 Q24.5 39.5 3 32 Q24.5 24.5 32 3 Z"
+            d="M18 18 a4 4 0 0 1 4-4 h20 a4 4 0 0 1 4 4 v16 a4 4 0 0 1 -4 4 h-12 l-7 6 v-6 h-1 a4 4 0 0 1 -4-4 z"
             fill="#faf9f5"
           />
-          <circle cx="32" cy="32" r="5.2" fill="#cc785c" />
+          <path
+            d="M25 26 l4 4 l8 -9"
+            fill="none"
+            stroke="#141413"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
     ),

@@ -100,8 +100,8 @@ const MsgAI = memo(function MsgAI({
 
   return (
     <div className="flex gap-3.5 pb-7 group/msg">
-      <div className="w-7 h-7 rounded-md bg-canvas border border-hairline flex items-center justify-center mt-0.5 shrink-0">
-        <SpikeMark size={13} color="var(--color-ink)" />
+      <div className="shrink-0 mt-0.5">
+        <SpikeMark size={22} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[12px] text-muted mb-1.5 font-medium">

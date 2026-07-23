@@ -1,17 +1,24 @@
 /**
- * 品牌火花 (Spark) — 内凹四芒星 + 珊瑚核心点。
+ * 品牌标志 — coral 圆角方块底 + cream 对话气泡 + ink 对勾。
  *
- * 设计稿在 claude-design-files/OC-Review Logo.html (方向 A · 推荐)。
- * 关键约束：
- *  - 几何用 SVG 三次贝塞尔近似的内凹四芒星，viewBox 64×64
- *  - 默认外形 #141413 (ink)，核心点 #cc785c (primary)
- *  - 默认始终渲染核心点，是品牌的"双色火花"语汇
- *  - 极小尺寸 / favicon / 单色场景可通过 showDot={false} 隐藏点
- *  - 不要旋转、不要渐变、不要描边
+ * 替代原"内凹四芒星火花"系统，新语义聚焦产品定位：
+ *  - coral 方块 = 品牌主色温度（warm canvas + coral 是 Anthropic 风格）
+ *  - 对话气泡 = "对话即界面"的产品形态
+ *  - 对勾 = 复盘通过 / 拿 offer 的结果意象
+ *
+ * API 保持与旧 SpikeMark 完全兼容（同名导出、同 props），所有引用处
+ * （welcome / expanded-sidebar / message-list）无需改动。
+ *
+ * 几何约束（viewBox 64×64）：
+ *  - 外层圆角方块 56×56，居中偏移 (4,4)，rx=14
+ *  - 气泡 cream 填充，右下内收成尾
+ *  - 对勾 ink，stroke 2.6，round cap/join
+ *  - 极小尺寸可 showDot=false 但本设计无核心点，参数保留只为兼容
  */
 
-const SPARK_PATH =
-  "M32 3 Q39.5 24.5 61 32 Q39.5 39.5 32 61 Q24.5 39.5 3 32 Q24.5 24.5 32 3 Z";
+const BUBBLE_PATH =
+  "M18 18 a4 4 0 0 1 4-4 h20 a4 4 0 0 1 4 4 v16 a4 4 0 0 1 -4 4 h-12 l-7 6 v-6 h-1 a4 4 0 0 1 -4-4 z";
+const CHECK_PATH = "M25 26 l4 4 l8 -9";
 
 export function SpikeMark({
   size = 16,
@@ -21,11 +28,11 @@ export function SpikeMark({
   className,
 }: {
   size?: number;
-  /** 火花本体颜色 */
+  /** 未使用，保留以兼容旧调用 */
   color?: string;
-  /** 中心珊瑚点颜色 */
+  /** 方块底色，默认品牌 coral */
   dotColor?: string;
-  /** 显式隐藏核心点（默认 true，用于 favicon / 极小尺寸 / 单色场景） */
+  /** 未使用，保留以兼容旧调用 */
   showDot?: boolean;
   className?: string;
 }) {
@@ -38,8 +45,16 @@ export function SpikeMark({
       className={className}
       aria-hidden
     >
-      <path d={SPARK_PATH} fill={color} />
-      {showDot && <circle cx="32" cy="32" r="4.4" fill={dotColor} />}
+      <rect x="4" y="4" width="56" height="56" rx="14" fill={dotColor} />
+      <path d={BUBBLE_PATH} fill="var(--color-canvas, #faf9f5)" />
+      <path
+        d={CHECK_PATH}
+        fill="none"
+        stroke="var(--color-ink, #141413)"
+        strokeWidth={2.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -47,7 +62,7 @@ export function SpikeMark({
 export function Wordmark({ size = 20 }: { size?: number }) {
   return (
     <div className="inline-flex items-center gap-2">
-      <SpikeMark size={size} color="var(--color-ink)" />
+      <SpikeMark size={size} />
       <span
         className="font-medium text-ink"
         style={{

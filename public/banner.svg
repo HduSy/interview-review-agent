@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="OC-Review banner">
+  <!-- Cream canvas background -->
+  <rect width="1200" height="630" fill="#faf9f5"/>
+
+  <!-- Top hairline -->
+  <rect x="80" y="80" width="1040" height="1" fill="#e6dfd8"/>
+
+  <!-- Top-right coral badge -->
+  <g transform="translate(960, 60)">
+    <rect width="160" height="34" rx="17" fill="#cc785c"/>
+    <text x="80" y="23" text-anchor="middle"
+          font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="500"
+          letter-spacing="1.5" fill="#ffffff">AI · MOCK · REVIEW</text>
+  </g>
+
+  <!-- Logo mark (left) -->
+  <g transform="translate(80, 210)">
+    <rect width="84" height="84" rx="20" fill="#cc785c"/>
+    <path d="M24 24 a5 5 0 0 1 5-5 h26 a5 5 0 0 1 5 5 v20 a5 5 0 0 1 -5 5 h-15 l-9 8 v-8 h-2 a5 5 0 0 1 -5-5 z"
+          fill="#faf9f5"/>
+    <path d="M33 37 l5 5 l10 -11" fill="none" stroke="#141413" stroke-width="3.2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Wordmark next to logo -->
+  <text x="188" y="278" font-family="Cormorant Garamond, Garamond, 'Times New Roman', serif"
+        font-size="48" font-weight="500" fill="#141413" letter-spacing="-1">OC-Review</text>
+
+  <!-- Main headline -->
+  <text x="80" y="396" font-family="Cormorant Garamond, Garamond, 'Times New Roman', serif"
+        font-size="68" font-weight="500" fill="#141413" letter-spacing="-1.5">AI Native 面试准备与复盘</text>
+
+  <!-- Sub headline -->
+  <text x="80" y="450" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="400"
+        fill="#3d3d3a">对话即界面 · 模拟 / 复盘 / 预测 / 练习 / 优化，本地优先</text>
+
+  <!-- Feature tags -->
+  <g font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="500" fill="#141413">
+    <g transform="translate(80, 500)">
+      <rect width="120" height="32" rx="16" fill="#efe9de"/>
+      <text x="60" y="21" text-anchor="middle">/mock 模拟</text>
+    </g>
+    <g transform="translate(212, 500)">
+      <rect width="120" height="32" rx="16" fill="#efe9de"/>
+      <text x="60" y="21" text-anchor="middle">/review 复盘</text>
+    </g>
+    <g transform="translate(344, 500)">
+      <rect width="132" height="32" rx="16" fill="#efe9de"/>
+      <text x="66" y="21" text-anchor="middle">/predict 预测</text>
+    </g>
+    <g transform="translate(488, 500)">
+      <rect width="140" height="32" rx="16" fill="#efe9de"/>
+      <text x="70" y="21" text-anchor="middle">/practice 练习</text>
+    </g>
+    <g transform="translate(640, 500)">
+      <rect width="140" height="32" rx="16" fill="#efe9de"/>
+      <text x="70" y="21" text-anchor="middle">/optimize 优化</text>
+    </g>
+  </g>
+
+  <!-- Bottom hairline + meta -->
+  <rect x="80" y="560" width="1040" height="1" fill="#e6dfd8"/>
+  <text x="80" y="588" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="400"
+        fill="#8e8b82">Next.js · React · TypeScript · Tailwind v4 · Vercel AI SDK · IndexedDB</text>
+  <text x="1120" y="588" text-anchor="end" font-family="Inter, system-ui, sans-serif"
+        font-size="13" font-weight="500" fill="#cc785c">findfunplus.cn</text>
+</svg>

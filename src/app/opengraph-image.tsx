@@ -52,7 +52,7 @@ export default async function Image() {
           }}
         />
 
-        {/* Top — brand row: spark mark + serif wordmark */}
+        {/* Top — brand row: bubble mark + serif wordmark */}
         <div
           style={{
             display: "flex",
@@ -61,11 +61,19 @@ export default async function Image() {
           }}
         >
           <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+            <rect x="4" y="4" width="56" height="56" rx="14" fill={COLORS.primary} />
             <path
-              d="M32 3 Q39.5 24.5 61 32 Q39.5 39.5 32 61 Q24.5 39.5 3 32 Q24.5 24.5 32 3 Z"
-              fill={COLORS.ink}
+              d="M18 18 a4 4 0 0 1 4-4 h20 a4 4 0 0 1 4 4 v16 a4 4 0 0 1 -4 4 h-12 l-7 6 v-6 h-1 a4 4 0 0 1 -4-4 z"
+              fill={COLORS.canvas}
             />
-            <circle cx="32" cy="32" r="4.4" fill={COLORS.primary} />
+            <path
+              d="M25 26 l4 4 l8 -9"
+              fill="none"
+              stroke={COLORS.ink}
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           <div
             style={{

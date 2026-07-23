@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64" role="img" aria-label="OC-Review">
+  <!-- Mark: rounded square coral background with speech bubble + check -->
+  <g transform="translate(4,4)">
+    <rect width="56" height="56" rx="14" fill="#cc785c"/>
+    <!-- Speech bubble (cream) with tail bottom-right -->
+    <path d="M14 16 a4 4 0 0 1 4-4 h20 a4 4 0 0 1 4 4 v16 a4 4 0 0 1 -4 4 h-12 l-7 6 v-6 h-1 a4 4 0 0 1 -4-4 z"
+          fill="#faf9f5"/>
+    <!-- Check mark (ink) inside bubble -->
+    <path d="M21 24 l4 4 l8 -9" fill="none" stroke="#141413" stroke-width="2.6"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Wordmark -->
+  <g font-family="Cormorant Garamond, Garamond, 'Times New Roman', serif"
+     font-weight="500" letter-spacing="-0.5">
+    <text x="76" y="40" font-size="28" fill="#141413">OC-Review</text>
+  </g>
+</svg>
