@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Rail } from "./rail";
 import { ExpandedSidebar } from "./expanded-sidebar";
 import { Welcome } from "./welcome";
@@ -17,17 +17,21 @@ export function Shell({ initialLocale }: { initialLocale: Locale }) {
   // via useT(), so the SSR body matches the cookie-driven <html lang> and there
   // is no hydration mismatch / flash of the default language.
   //
-  // Crucially this mutates getInitialState(), not just setState: zustand's
-  // useSyncExternalStore server snapshot reads getInitialState() (see
-  // node_modules/zustand/esm/react.mjs), so during SSR the children render with
-  // the *initial* state, not the current one. We run in the client module graph
-  // here (Shell is "use client"), which is the same store instance the children
-  // use — unlike the server-graph store that page.tsx sees.
-  if (useAppStore.getState().locale !== initialLocale) {
-    setActiveLocale(initialLocale);
-    useAppStore.getInitialState().locale = initialLocale;
-    useAppStore.setState({ locale: initialLocale });
-  }
+  // We use a useState lazy initializer (runs once, during this component's
+  // first render, but BEFORE any child mounts) so the store update commits
+  // before Rail / Welcome subscribe. Calling setState directly in the render
+  // body is a React 19 anti-pattern: it cascades the update into siblings
+  // that are currently rendering and throws "Cannot update a component while
+  // rendering a different component." The lazy initializer is the sanctioned
+  // way to perform a one-shot side effect during render.
+  useState(() => {
+    if (useAppStore.getState().locale !== initialLocale) {
+      setActiveLocale(initialLocale);
+      useAppStore.getInitialState().locale = initialLocale;
+      useAppStore.setState({ locale: initialLocale });
+    }
+    return initialLocale;
+  });
 
   const view = useAppStore((s) => s.view);
   const chatMode = useAppStore((s) => s.chatMode);
