@@ -46,5 +46,13 @@ next-env.d.ts
 
 # claude code local permissions
 .claude/settings.local.json
+# claude code worktrees / sessions / transient state
+.claude/worktrees/
+.claude/sessions/
+.claude/todos/
+.claude/shells/
+
+# local-only preview / scratch (not for production)
+public/logo-preview.html
 
 certificates

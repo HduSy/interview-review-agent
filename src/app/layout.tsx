@@ -181,6 +181,16 @@ export default async function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        {/* VibeLoft Web Telemetry — loads only from https://vibeloft.ai,
+            events only POST to https://api.vibeloft.ai. No CSP exists in
+            this project (no vercel.json headers / middleware / _headers),
+            so no CSP change is needed per VibeLoft integration rules. */}
+        <script
+          defer
+          src="https://vibeloft.ai/telemetry/v1.js"
+          data-vl-product-id="14f2613d-034e-4104-bff6-30c8c5ebd7d0"
+          data-vl-auth-key="vl_web.eedznMDj8skfJUWJlzwmQY0PWmaHqmFgpLwXAp5xOis"
+        />
       </head>
       <body className="min-h-full">
         {children}
